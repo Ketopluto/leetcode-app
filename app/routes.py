@@ -155,7 +155,6 @@ def process_student(student):
     return result
 
 @app.route("/")
-@cache.cached(timeout=60)
 def index():
     results = []
     with ThreadPoolExecutor(max_workers=10) as executor:
