@@ -89,7 +89,7 @@ Want to contribute? 🛠️ Fork the repo and submit a pull request.
 This project is licensed under the MIT License. See the LICENSE file for more details.
 
 ## ❤️ Thank You!
-Thanks for checking out the LeetCode App! We hope it helps you stay on top of your coding game. 🎯
+Thanks for checking out the LeetCode Statistics Dashboard! We hope it helps you stay on top of your coding game. 🎯
 
 📧 Questions? Suggestions? Reach out to me anytime. 🚀
 
