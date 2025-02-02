@@ -88,11 +88,18 @@ def create_session():
     return session
 
 def fetch_leetcode_stats(username):
+    """Fetch fresh stats from LeetCode API"""
     if username == "higher studies":
         return {"easy": 0, "medium": 0, "hard": 0, "total": 0}
+    
     session = create_session()
     try:
-        res = session.get(f"https://leetcode-stats-api.herokuapp.com/{username}", timeout=3)
+        # Add a timestamp parameter to prevent caching
+        timestamp = datetime.now().timestamp()
+        res = session.get(
+            f"https://leetcode-stats-api.herokuapp.com/{username}?t={timestamp}", 
+            timeout=3
+        )
         if res.status_code == 200:
             data = res.json()
             if data.get("status") == "success":
@@ -106,32 +113,28 @@ def fetch_leetcode_stats(username):
         print(f"Error fetching {username}: {e}")
     return {"easy": 0, "medium": 0, "hard": 0, "total": 0}
 
+
 def process_student(student):
     username, name, roll_no = student
-    # Each threaded call needs its own application context.
     with app.app_context():
+        # Always fetch new stats first
+        new_stats = fetch_leetcode_stats(username)
+        
+        # Get or create database record
         stat_record = StudentStats.query.filter_by(username=username, roll_no=roll_no).first()
+        
         if stat_record:
-            new_stats = fetch_leetcode_stats(username)
-            if new_stats["total"] > stat_record.total:
+            # Update if new total is different
+            if new_stats["total"] != stat_record.total:
                 stat_record.easy = new_stats["easy"]
                 stat_record.medium = new_stats["medium"]
                 stat_record.hard = new_stats["hard"]
                 stat_record.total = new_stats["total"]
                 stat_record.last_updated = datetime.utcnow()
                 db.session.commit()
-            result = {
-                "roll_no": roll_no,
-                "actual_name": name,
-                "username": username,
-                "easy": stat_record.easy,
-                "medium": stat_record.medium,
-                "hard": stat_record.hard,
-                "total": stat_record.total
-            }
         else:
-            new_stats = fetch_leetcode_stats(username)
-            new_record = StudentStats(
+            # Create new record
+            stat_record = StudentStats(
                 username=username,
                 actual_name=name,
                 roll_no=roll_no,
@@ -141,21 +144,21 @@ def process_student(student):
                 total=new_stats["total"],
                 last_updated=datetime.utcnow()
             )
-            db.session.add(new_record)
+            db.session.add(stat_record)
             db.session.commit()
-            result = {
-                "roll_no": roll_no,
-                "actual_name": name,
-                "username": username,
-                "easy": new_stats["easy"],
-                "medium": new_stats["medium"],
-                "hard": new_stats["hard"],
-                "total": new_stats["total"]
-            }
-    return result
+        
+        return {
+            "roll_no": roll_no,
+            "actual_name": name,
+            "username": username,
+            "easy": new_stats["easy"],
+            "medium": new_stats["medium"],
+            "hard": new_stats["hard"],
+            "total": new_stats["total"]
+        }
+
 
 @app.route("/")
-@cache.cached(timeout=60)
 def index():
     results = []
     with ThreadPoolExecutor(max_workers=10) as executor:
