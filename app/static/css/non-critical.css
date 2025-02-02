@@ -1,0 +1,46 @@
+/* Non-critical styles that can be loaded async */
+h1 { 
+    color: #333;
+    text-align: center;
+    margin-bottom: 30px;
+}
+.container {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+th, td { 
+    border: 1px solid #ddd; 
+    padding: 12px 8px;
+    text-align: center;
+}
+th { 
+    background-color: #4CAF50;
+    color: white;
+    font-weight: bold;
+}
+tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+tr:hover {
+    background-color: #f5f5f5;
+}
+.higher-studies {
+    background-color: #fff3cd !important;
+    color: #856404;
+}
+.higher-studies:hover {
+    background-color: #fff0b3 !important;
+}
+.download-btn {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+.download-btn:hover {
+    background-color: #45a049;
+}
