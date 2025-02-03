@@ -44,3 +44,13 @@ tr:hover {
 .download-btn:hover {
     background-color: #45a049;
 }
+
+.loading-text {
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+/* End of non-critical.css */

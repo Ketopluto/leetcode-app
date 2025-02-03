@@ -1,4 +1,5 @@
 import csv
+import os
 import io
 import requests
 from datetime import datetime
@@ -6,76 +7,30 @@ from concurrent.futures import ThreadPoolExecutor
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from flask import render_template, make_response
-from app import app, db, cache
-from app.models import StudentStats
+from flask import render_template, make_response, request
+from app import app, cache
 
-# Student data structure (username, name, roll_no)
-students = [
-    ("SRIbNNFCEY", "Aallan Hrithick A S", "310622148001"),
-    ("higher studies", "Achyuthnarayanan M", "310622148002"),
-    ("higher studies", "Alban J", "310622148003"),
-    ("Archana0521", "Archana V C Nair", "310622148004"),
-    ("ARYA_SUDHEER", "Arya S", "310622148005"),
-    ("asvika_28", "Asvika M A", "310622148006"),
-    ("bala_shivani", "Bala Shivani P D", "310622148007"),
-    ("bharwtg300922", "Bharath K", "310622148008"),
-    ("Deepthavc", "Deeptha V", "310622148009"),
-    ("Divyaa_05_", "Divyaa B", "310622148010"),
-    ("DurgaL011", "Durga L", "310622148011"),
-    ("fahmitha4", "Fahmitha Farhana S", "310622148012"),
-    ("Harini_3538", "Harini V", "310622148013"),
-    ("Harsha21062004", "Harsha Varthini S", "310622148014"),
-    ("kZn84IKEv5", "Harshita V", "310622148015"),
-    ("Jaya_Arshin", "Jaya Arshin A", "310622148016"),
-    ("jeniliagracelyn", "Jenilia Gracelyn S", "310622148017"),
-    ("Jhaishnavi_S", "Jhaishnavi S", "310622148018"),
-    ("higher studies", "Kaaviya B", "310622148019"),
-    ("higher studies", "Kavitha A", "310622148020"),
-    ("RVkaviya", "Kaviya R V", "310622148021"),
-    ("keertij", "Keerti J", "310622148022"),
-    ("higher studies", "Manikanda Ganapathi T", "310622148023"),
-    ("Manvik_ram", "Manoj Ram K", "310622148024"),
-    ("ManuSavithri", "Manu Savithri V", "310622148025"),
-    ("MP0ZkaD5OP", "Megala P", "310622148026"),
-    ("higher studies", "Mohammed Mohseen A", "310622148027"),
-    ("Mohnish_KJ", "Mohnish K J", "310622148028"),
-    ("higher studies", "Narendran G T", "310622148029"),
-    ("Nav3005", "Naveen Karthik R", "310622148030"),
-    ("poovarasan_03", "Poovarasan G", "310622148031"),
-    ("rakheshkrishnap", "Rakhesh Krishna P", "310622148032"),
-    ("RanjanaG", "Ranjana G", "310622148033"),
-    ("SEPYbnmEIv", "Rithanya V R", "310622148034"),
-    ("Rohit_Chandramohan", "Rohit C", "310622148035"),
-    ("Zaw5lz57ys", "Ruchikaa K", "310622148036"),
-    ("Sam_jefferson_2005", "Sam Jefferson M P", "310622148037"),
-    ("Saranya_874", "Saranya K", "310622148038"),
-    ("Sheshanathan", "Sheshanathan S", "310622148039"),
-    ("Snehapm", "Sneha P M", "310622148040"),
-    ("iAJ3eWxBRW", "Sri Rajarajeswaran B", "310622148041"),
-    ("sudiptasundar27", "Sudipta Sundar", "310622148042"),
-    ("sujeth_21", "Sujeth S", "310622148043"),
-    ("Sundar_2104", "Sundaram R K", "310622148044"),
-    ("suprajavenkatesan", "Supraja Venkatesan", "310622148045"),
-    ("Tanush_83", "Tanush T M", "310622148046"),
-    ("TejaswiniDhakshnamurthy", "Tejaswini D", "310622148047"),
-    ("Varun_Kumar_04", "Varun Kumar G S", "310622148048"),
-    ("Vignesh49", "Vignesh M", "310622148049"),
-    ("Vinodhini-K", "Vinodhini K", "310622148050"),
-    ("Vishnu_MP2004", "Vishnu Manheri Puthiyaveetil", "310622148051"),
-    ("vishveswarR", "Vishveswar R", "310622148053"),
-    ("avs242004", "Visvesh Sanathan A", "310622148054"),
-    ("Viswa_312004", "Viswa K", "310622148055"),
-    ("yukitha04", "Yukitha K", "310622148056"),
-    ("ksamanasesh", "Manasesh S", "310622148301"),
-    ("ashif13", "Mohamed Ashif A", "310622148302"),
-    ("71jBRQtgg5", "Pranavaa P", "310622148303"),
-    ("higher studies", "Saieed Marichamy", "310622148304"),
-    ("sakthivel17", "Sakthivel A", "310622148305"),
-    ("velmuruganr21", "Velmurugan R", "310622148306")
-]
+def load_students_data():
+    students = []
+    current_year = None
+    # Assuming students.txt is in the project root.
+    file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "students.txt")
+    with open(file_path, "r") as file:
+        for line in file:
+            line = line.strip()
+            if not line:
+                continue
+            if line.endswith("Students:"):
+                current_year = line.replace("Students:", "").strip()
+            else:
+                parts = line.split(",")
+                if len(parts) == 3 and current_year:
+                    username, name, roll_no = [p.strip() for p in parts]
+                    students.append((username, name, roll_no, current_year))
+    return students
 
-# Create a session with retry logic for API calls
+students = load_students_data()
+
 def create_session():
     session = requests.Session()
     retries = Retry(
@@ -87,120 +42,95 @@ def create_session():
     session.mount('https://', adapter)
     return session
 
+@cache.memoize(timeout=600)
 def fetch_leetcode_stats(username):
-    """Fetch fresh stats from LeetCode API with no caching"""
+    """
+    Fetch LeetCode statistics using the designated API endpoint.
+    This endpoint is: https://leetcode-api-faisalshohag.vercel.app/<username>
+    """
     if username == "higher studies":
         return {"easy": 0, "medium": 0, "hard": 0, "total": 0}
     
     session = create_session()
+    url = f"https://leetcode-api-faisalshohag.vercel.app/{username}"
     try:
-        # Add timestamp to prevent caching
-        timestamp = datetime.now().timestamp()
-        url = f"https://leetcode-stats-api.herokuapp.com/{username}?t={timestamp}"
-        print(f"Fetching stats for {username}")  # Debug log
-        
-        res = session.get(url, timeout=5)  # Increased timeout
-        print(f"Response for {username}: {res.status_code}")  # Debug log
-        
+        full_url = f"{url}?t={datetime.now().timestamp()}"
+        print(f"Fetching stats for {username} from {full_url}")
+        res = session.get(full_url, timeout=5)
         if res.status_code == 200:
             data = res.json()
-            print(f"Data for {username}: {data}")  # Debug log
-            if data.get("status") == "success":
-                stats = {
-                    "easy": data.get("easySolved", 0),
-                    "medium": data.get("mediumSolved", 0),
-                    "hard": data.get("hardSolved", 0),
-                    "total": data.get("totalSolved", 0)
-                }
-                print(f"Processed stats for {username}: {stats}")  # Debug log
-                return stats
+            return {
+                "easy": data.get("easySolved", 0),
+                "medium": data.get("mediumSolved", 0),
+                "hard": data.get("hardSolved", 0),
+                "total": data.get("totalSolved", 0)
+            }
     except Exception as e:
         print(f"Error fetching {username}: {e}")
     return {"easy": 0, "medium": 0, "hard": 0, "total": 0}
 
-
 def process_student(student):
-    username, name, roll_no = student
-    with app.app_context():
-        # Always fetch fresh stats
-        new_stats = fetch_leetcode_stats(username)
-        print(f"Processing {username} with stats: {new_stats}")  # Debug log
-        
-        stat_record = StudentStats.query.filter_by(username=username, roll_no=roll_no).first()
-        
-        if stat_record:
-            # Always update with fresh data
-            stat_record.easy = new_stats["easy"]
-            stat_record.medium = new_stats["medium"]
-            stat_record.hard = new_stats["hard"]
-            stat_record.total = new_stats["total"]
-            stat_record.last_updated = datetime.utcnow()
-            db.session.commit()
-            print(f"Updated record for {username}")  # Debug log
-        else:
-            # Create new record
-            new_record = StudentStats(
-                username=username,
-                actual_name=name,
-                roll_no=roll_no,
-                easy=new_stats["easy"],
-                medium=new_stats["medium"],
-                hard=new_stats["hard"],
-                total=new_stats["total"],
-                last_updated=datetime.utcnow()
-            )
-            db.session.add(new_record)
-            db.session.commit()
-            print(f"Created new record for {username}")  # Debug log
-        
-        return {
-            "roll_no": roll_no,
-            "actual_name": name,
-            "username": username,
-            "easy": new_stats["easy"],
-            "medium": new_stats["medium"],
-            "hard": new_stats["hard"],
-            "total": new_stats["total"]
-        }
-
+    """Fetch a student's stats using the new API (no DB integration)."""
+    username, name, roll_no, year = student
+    stats = fetch_leetcode_stats(username)
+    return {
+        "roll_no": roll_no,
+        "actual_name": name,
+        "username": username,
+        "year": year,
+        "easy": stats["easy"],
+        "medium": stats["medium"],
+        "hard": stats["hard"],
+        "total": stats["total"]
+    }
 
 @app.route("/")
 def index():
-    results = []
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = [executor.submit(process_student, student) for student in students]
-        for future in futures:
-            try:
-                results.append(future.result())
-            except Exception as e:
-                print(f"Error processing student: {e}")
-    
-    results.sort(key=lambda x: x["roll_no"])
-    top_solvers = StudentStats.query.order_by(StudentStats.total.desc()).limit(7).all()
-    top_7_data = [{
-        'username': solver.username, 
-        'actual_name': solver.actual_name, 
-        'total': solver.total
-    } for solver in top_solvers]
-    
-    return render_template("index.html", results=results, top_5_data=top_7_data)
-
+    # This endpoint now renders the main page; content is loaded asynchronously.
+    return render_template("index.html")
 
 @app.route("/download")
 def download_csv():
-    results = []
+    selected_year = request.args.get("year", None)
+    all_results = []
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = [executor.submit(process_student, student) for student in students]
         for future in futures:
-            results.append(future.result())
+            all_results.append(future.result())
+    if selected_year:
+        results = [r for r in all_results if r["year"] == selected_year]
+    else:
+        results = all_results
+
     results.sort(key=lambda x: x["roll_no"])
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Roll Number", "Name", "LeetCode Username", "Easy Solved", "Medium Solved", "Hard Solved", "Total Solved"])
+    writer.writerow(["Roll Number", "Name", "LeetCode Username", "Year", "Easy Solved", "Medium Solved", "Hard Solved", "Total Solved"])
     for row in results:
-        writer.writerow([row["roll_no"], row["actual_name"], row["username"],
+        writer.writerow([row["roll_no"], row["actual_name"], row["username"], row["year"],
                          row["easy"], row["medium"], row["hard"], row["total"]])
     response = make_response(output.getvalue())
-    response.headers["Content-Disposition"] = "attachment; filename=leetcode_stats.csv"
+    filename = f"leetcode_stats_{selected_year if selected_year else 'all'}.csv"
+    response.headers["Content-Disposition"] = f"attachment; filename={filename}"
     response.headers["Content-type"] = "text/csv"
     return response
+
+@app.route("/api/stats")
+def api_stats():
+    selected_year = request.args.get("year", None)
+    all_results = []
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(process_student, student) for student in students]
+        for future in futures:
+            all_results.append(future.result())
+    if selected_year:
+        results = [r for r in all_results if r["year"] == selected_year]
+    else:
+        results = all_results
+    results.sort(key=lambda x: x["roll_no"])
+    return {"results": results}
+
+@app.route("/refresh/<username>")
+def refresh_user(username):
+    cache.delete_memoized(fetch_leetcode_stats, username)
+    return f"Cache cleared for {username}. Next request will fetch fresh data."
