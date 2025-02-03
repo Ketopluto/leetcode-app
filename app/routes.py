@@ -42,7 +42,7 @@ def create_session():
     session.mount('https://', adapter)
     return session
 
-@cache.memoize(timeout=600)
+#@cache.memoize(timeout=600)
 def fetch_leetcode_stats(username):
     """
     Fetch LeetCode statistics using the designated API endpoint.
