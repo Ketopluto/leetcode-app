@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: leetcode-stats
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: leetcode-stats-db
+          property: connectionString
+
+databases:
+  - name: leetcode-stats-db
+    ipAllowList: []

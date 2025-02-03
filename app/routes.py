@@ -88,27 +88,32 @@ def create_session():
     return session
 
 def fetch_leetcode_stats(username):
-    """Fetch fresh stats from LeetCode API"""
+    """Fetch fresh stats from LeetCode API with no caching"""
     if username == "higher studies":
         return {"easy": 0, "medium": 0, "hard": 0, "total": 0}
     
     session = create_session()
     try:
-        # Add a timestamp parameter to prevent caching
+        # Add timestamp to prevent caching
         timestamp = datetime.now().timestamp()
-        res = session.get(
-            f"https://leetcode-stats-api.herokuapp.com/{username}?t={timestamp}", 
-            timeout=3
-        )
+        url = f"https://leetcode-stats-api.herokuapp.com/{username}?t={timestamp}"
+        print(f"Fetching stats for {username}")  # Debug log
+        
+        res = session.get(url, timeout=5)  # Increased timeout
+        print(f"Response for {username}: {res.status_code}")  # Debug log
+        
         if res.status_code == 200:
             data = res.json()
+            print(f"Data for {username}: {data}")  # Debug log
             if data.get("status") == "success":
-                return {
+                stats = {
                     "easy": data.get("easySolved", 0),
                     "medium": data.get("mediumSolved", 0),
                     "hard": data.get("hardSolved", 0),
                     "total": data.get("totalSolved", 0)
                 }
+                print(f"Processed stats for {username}: {stats}")  # Debug log
+                return stats
     except Exception as e:
         print(f"Error fetching {username}: {e}")
     return {"easy": 0, "medium": 0, "hard": 0, "total": 0}
@@ -117,24 +122,24 @@ def fetch_leetcode_stats(username):
 def process_student(student):
     username, name, roll_no = student
     with app.app_context():
-        # Always fetch new stats first
+        # Always fetch fresh stats
         new_stats = fetch_leetcode_stats(username)
+        print(f"Processing {username} with stats: {new_stats}")  # Debug log
         
-        # Get or create database record
         stat_record = StudentStats.query.filter_by(username=username, roll_no=roll_no).first()
         
         if stat_record:
-            # Update if new total is different
-            if new_stats["total"] != stat_record.total:
-                stat_record.easy = new_stats["easy"]
-                stat_record.medium = new_stats["medium"]
-                stat_record.hard = new_stats["hard"]
-                stat_record.total = new_stats["total"]
-                stat_record.last_updated = datetime.utcnow()
-                db.session.commit()
+            # Always update with fresh data
+            stat_record.easy = new_stats["easy"]
+            stat_record.medium = new_stats["medium"]
+            stat_record.hard = new_stats["hard"]
+            stat_record.total = new_stats["total"]
+            stat_record.last_updated = datetime.utcnow()
+            db.session.commit()
+            print(f"Updated record for {username}")  # Debug log
         else:
             # Create new record
-            stat_record = StudentStats(
+            new_record = StudentStats(
                 username=username,
                 actual_name=name,
                 roll_no=roll_no,
@@ -144,8 +149,9 @@ def process_student(student):
                 total=new_stats["total"],
                 last_updated=datetime.utcnow()
             )
-            db.session.add(stat_record)
+            db.session.add(new_record)
             db.session.commit()
+            print(f"Created new record for {username}")  # Debug log
         
         return {
             "roll_no": roll_no,
@@ -164,12 +170,21 @@ def index():
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = [executor.submit(process_student, student) for student in students]
         for future in futures:
-            results.append(future.result())
+            try:
+                results.append(future.result())
+            except Exception as e:
+                print(f"Error processing student: {e}")
+    
     results.sort(key=lambda x: x["roll_no"])
-    # Query the database for the top 5 problem solvers.
     top_solvers = StudentStats.query.order_by(StudentStats.total.desc()).limit(7).all()
-    top_7_data = [{'username': solver.username, 'actual_name': solver.actual_name, 'total': solver.total} for solver in top_solvers]
-    return render_template("index.html", results=results, top_7_data=top_7_data)
+    top_7_data = [{
+        'username': solver.username, 
+        'actual_name': solver.actual_name, 
+        'total': solver.total
+    } for solver in top_solvers]
+    
+    return render_template("index.html", results=results, top_5_data=top_7_data)
+
 
 @app.route("/download")
 def download_csv():
