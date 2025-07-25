@@ -78,7 +78,7 @@
 
     <!-- Leaderboard Section -->
     <div class="leaderboard" id="leaderboard">
-      <h2>Top 10 Problem Solvers</h2>
+      <h2>Top 5 Problem Solvers</h2>
       <ul id="leaderboardList">
         <!-- Leaderboard data will be inserted here -->
       </ul>
@@ -129,7 +129,7 @@
     // Function to build leaderboard from results.
     function buildLeaderboard(results) {
       // Sort descending by total solved and pick top 7.
-      let top7 = results.sort((a, b) => b.total - a.total).slice(0, 10);
+      let top7 = results.sort((a, b) => b.total - a.total).slice(0, 5);
       let html = '';
       top7.forEach(solver => {
         html += `<li>
