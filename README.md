@@ -8,19 +8,13 @@
 
 ## ✨ Features
 
-### 📊 1. Database Connection
-The app connects seamlessly to an **SQLite database** to store:
-- 🧑‍🎓 Student usernames, names, and roll numbers.
-- 🏆 Statistics for problems solved at different difficulty levels (**Easy**, **Medium**, **Hard**).
-- 📅 The total number of problems solved and the **last update timestamp**.
-
-### 🏅 2. Leaderboard Visibility
+### 🏅 1. Leaderboard Visibility
 View a dynamic **leaderboard** that showcases:
 - 📈 Rankings based on students' performance.
 - 🎯 Detailed statistics for each student.
 - 👀 A clean and interactive interface to track progress.
 
-### 📥 3. Download CSV
+### 📥 2. Download CSV
 With just one click, download the leaderboard data as a **CSV file** for:
 - 📊 Data analysis.
 - 📝 Generating reports.
@@ -37,7 +31,7 @@ The app is live and hosted on **Render**.
 
 ## 🛠️ Usage Instructions
 
-### 👉 1. Run Locally
+### 👉 Run Locally
 Clone the repository and set up the app on your local machine:  
 ```bash
 git clone https://github.com/your-repo-name.git
@@ -60,22 +54,9 @@ flask run
 
 #Access it locally at: http://127.0.0.1:5000/
 
-### 🔗 2. Database Setup
-The app uses an SQLite database (stats.db) included in the repository.
-Run migrations or updates if needed using Flask commands.
-
-### 🌍 3. Deploying Your Own Version
-This app can be deployed for free on platforms like Render or Railway.
-If you want to deploy your version, you can follow these steps:
-
-- Push your code to a GitHub repository.
-- Link it to Render.
-- Enjoy your live app in minutes!
-
 ## 🛠️ Tech Stack
 - Frontend: 🖌️ HTML, CSS
 - Backend: 🐍 Python, Flask
-- Database: 📂 SQLite
 - Deployment: 🚀 Render
 
 ## 🤝 Contributing
