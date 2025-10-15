@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Student - Admin Panel</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #f8f9fa;
+      color: #2d3748;
+    }
+
+    .navbar {
+      background-color: #ffffff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      padding: 15px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+
+    .navbar-brand {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1a202c;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .navbar-links {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .navbar-link {
+      color: #4a5568;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .navbar-link:hover {
+      background-color: #f7fafc;
+      color: #3b82f6;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 30px 40px;
+    }
+
+    .header {
+      background: #ffffff;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      margin-bottom: 30px;
+    }
+
+    .header h1 {
+      font-size: 32px;
+      color: #1a202c;
+      margin-bottom: 10px;
+    }
+
+    .form-card {
+      background: #ffffff;
+      padding: 35px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .form-group {
+      margin-bottom: 25px;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #cbd5e0;
+      border-radius: 8px;
+      font-size: 15px;
+      transition: all 0.3s ease;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .form-hint {
+      font-size: 13px;
+      color: #718096;
+      margin-top: 6px;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 15px;
+      margin-top: 30px;
+    }
+
+    .btn {
+      padding: 12px 28px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .btn-primary {
+      background-color: #3b82f6;
+      color: #ffffff;
+      border: none;
+    }
+
+    .btn-primary:hover {
+      background-color: #2563eb;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
+
+    .btn-secondary {
+      background-color: #e2e8f0;
+      color: #2d3748;
+      border: none;
+    }
+
+    .btn-secondary:hover {
+      background-color: #cbd5e0;
+    }
+
+    .alert {
+      padding: 14px 18px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+
+    .alert-error {
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="navbar-brand">
+      <span>📊</span>
+      <span>LeetCode Stats</span>
+    </a>
+    <div class="navbar-links">
+      <a href="/admin/students" class="navbar-link">
+        <span>←</span>
+        <span>Back to Students</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="header">
+      <h1>✏️ Edit Student</h1>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="form-card">
+      <form method="POST">
+        <div class="form-group">
+          <label for="name">Full Name *</label>
+          <input type="text" id="name" name="name" value="{{ student.name }}" required>
+        </div>
+
+        <div class="form-group">
+          <label for="register_number">Register Number *</label>
+          <input type="text" id="register_number" name="register_number" 
+                 value="{{ student.register_number }}" required>
+          <p class="form-hint">Example: 310623148001</p>
+        </div>
+
+        <div class="form-group">
+          <label for="leetcode_username">LeetCode Username or Profile URL *</label>
+          <input type="text" id="leetcode_username" name="leetcode_username" 
+                 value="{{ student.leetcode_username }}" required>
+          <p class="form-hint">You can enter just the username or full profile URL</p>
+        </div>
+
+        <div class="form-group">
+          <label for="year">Year *</label>
+          <select id="year" name="year" required>
+            <option value="1" {% if student.year == 1 %}selected{% endif %}>1st Year</option>
+            <option value="2" {% if student.year == 2 %}selected{% endif %}>2nd Year</option>
+            <option value="3" {% if student.year == 3 %}selected{% endif %}>3rd Year</option>
+            <option value="4" {% if student.year == 4 %}selected{% endif %}>4th Year</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="section">Section (Optional)</label>
+          <select id="section" name="section">
+            <option value="">No Section</option>
+            <option value="A" {% if student.section == 'A' %}selected{% endif %}>Section A</option>
+            <option value="B" {% if student.section == 'B' %}selected{% endif %}>Section B</option>
+            <option value="C" {% if student.section == 'C' %}selected{% endif %}>Section C</option>
+          </select>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">💾 Save Changes</button>
+          <a href="{{ url_for('admin_students') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
