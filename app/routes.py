@@ -73,16 +73,16 @@ async def fetch_leetcode_stats_async(username):
     return {"easy": 0, "medium": 0, "hard": 0, "total": 0}
 
 
-async def fetch_all_stats_async():
-    """Fetch stats for all students in small batches to prevent OOM."""
+aasync def fetch_all_stats_async():
+    """Fetch stats for all students in optimized batches."""
     students = load_students_from_db()
     
-    # Process in batches of 20 students
-    batch_size = 20
+    # Larger batches for Vercel (has more memory than Render)
+    batch_size = 50  # Increased from 20
     all_results = []
     
-    connector = aiohttp.TCPConnector(limit=10)  # Only 10 concurrent connections
-    timeout = aiohttp.ClientTimeout(total=10)
+    connector = aiohttp.TCPConnector(limit=25)  # Increased from 10
+    timeout = aiohttp.ClientTimeout(total=8)  # Slightly reduced for faster failure
     
     async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
         for i in range(0, len(students), batch_size):
@@ -95,15 +95,18 @@ async def fetch_all_stats_async():
                 tasks.append(task)
             
             # Process this batch
-            batch_results = await asyncio.gather(*tasks)
-            all_results.extend(batch_results)
+            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
             
-            # Small delay between batches to prevent overwhelming the server
+            # Filter out exceptions and add valid results
+            for result in batch_results:
+                if isinstance(result, dict):
+                    all_results.append(result)
+            
+            # Smaller delay between batches
             if i + batch_size < len(students):
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.2)  # Reduced from 0.5
     
     return all_results
-
 
 async def fetch_student_stats_async(username, name, roll_no, year, section, session):
     """Fetch a student's stats using an existing session."""
@@ -111,13 +114,12 @@ async def fetch_student_stats_async(username, name, roll_no, year, section, sess
         stats = {"easy": 0, "medium": 0, "hard": 0, "total": 0}
     else:
         url = f"https://leetcode-api-faisalshohag.vercel.app/{username}"
-        full_url = f"{url}?t={datetime.now().timestamp()}"
         
         stats = {"easy": 0, "medium": 0, "hard": 0, "total": 0}
         try:
-            for attempt in range(3):
+            for attempt in range(2):  # Reduced from 3 attempts to 2
                 try:
-                    async with session.get(full_url) as response:
+                    async with session.get(url) as response:
                         if response.status == 200:
                             data = await response.json()
                             stats = {
@@ -128,9 +130,8 @@ async def fetch_student_stats_async(username, name, roll_no, year, section, sess
                             }
                             break
                 except Exception as e:
-                    print(f"Attempt {attempt+1} failed for {username}: {e}")
-                    if attempt < 2:
-                        await asyncio.sleep(0.5 * (attempt + 1))
+                    if attempt < 1:
+                        await asyncio.sleep(0.2)  # Reduced from 0.5
         except Exception as e:
             print(f"Error fetching {username}: {e}")
     
