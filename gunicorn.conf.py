@@ -1,6 +1,6 @@
 bind = "0.0.0.0:8000"
 workers = 4
 worker_class = "gevent"
-worker_connections = 1000
+worker_connections = 100
 timeout = 30
 keepalive = 2
