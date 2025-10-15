@@ -38,3 +38,14 @@ Thumbs.db
 # Batch files
 *.bat
 *.cmd
+
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+.venv/
+leetcode_stats.db
+students.txt
+*.log
+.vercel

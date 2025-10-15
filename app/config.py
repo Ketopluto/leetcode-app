@@ -12,19 +12,17 @@ class Config:
     
     if DATABASE_URL:
         # Production: Use Supabase PostgreSQL
-        # Fix for SQLAlchemy (postgres:// -> postgresql://)
         if DATABASE_URL.startswith('postgres://'):
             DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
         SQLALCHEMY_DATABASE_URI = DATABASE_URL
     else:
-        # Local development: Use SQLite
-        BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-        SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(BASE_DIR, '..', 'leetcode_stats.db')
+        # Development: Use SQLite
+        SQLALCHEMY_DATABASE_URI = 'sqlite:////tmp/leetcode_stats.db'
     
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
-    # Upload folder
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), '..', 'uploads')
+    # Upload folder (Vercel uses /tmp for temporary storage)
+    UPLOAD_FOLDER = '/tmp/uploads' if os.environ.get('VERCEL') else 'uploads'
     ALLOWED_EXTENSIONS = {'xlsx', 'xls'}
     
     # Cache configuration
