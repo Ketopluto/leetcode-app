@@ -1,6 +1,6 @@
 bind = "0.0.0.0:10000"
 workers = 1
-worker_class = "gevent"
+worker_class = "uvicorn.workers.UvicornWorker"
 worker_connections = 20  # Further reduced
 timeout = 900  # 15 minutes for large student lists
 keepalive = 5
