@@ -73,7 +73,7 @@ async def fetch_leetcode_stats_async(username):
     return {"easy": 0, "medium": 0, "hard": 0, "total": 0}
 
 
-aasync def fetch_all_stats_async():
+async def fetch_all_stats_async():
     """Fetch stats for all students in optimized batches."""
     students = load_students_from_db()
     
