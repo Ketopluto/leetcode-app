@@ -1,18 +1,23 @@
 import os
 
 class Config:
-    # Secret key - read from environment variable or use default for dev
+    # Secret key
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
     
-    # HOD password - read from environment variable or use default for dev
+    # HOD password
     HOD_PASSWORD = os.environ.get('HOD_PASSWORD', 'hod_secure_password_123')
     
-    # Database - use persistent disk path on Render, local path in dev
-    if os.environ.get('RENDER'):
-        # On Render, use /data persistent disk
-        SQLALCHEMY_DATABASE_URI = 'sqlite:////data/leetcode_stats.db'
+    # Database configuration
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+    
+    if DATABASE_URL:
+        # Production: Use Supabase PostgreSQL
+        # Fix for SQLAlchemy (postgres:// -> postgresql://)
+        if DATABASE_URL.startswith('postgres://'):
+            DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+        SQLALCHEMY_DATABASE_URI = DATABASE_URL
     else:
-        # Local development
+        # Local development: Use SQLite
         BASE_DIR = os.path.abspath(os.path.dirname(__file__))
         SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(BASE_DIR, '..', 'leetcode_stats.db')
     
