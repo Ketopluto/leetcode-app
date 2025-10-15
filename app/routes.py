@@ -10,8 +10,10 @@ import pandas as pd
 from app import app, cache, db
 from app.models import Student, UploadLog
 
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+
 
 def get_available_year_sections():
     """Get list of available year and section combinations from database"""
@@ -33,11 +35,13 @@ def get_available_year_sections():
     print(f"Available year-section options: {options}")
     return options
 
+
 def load_students_from_db():
     """Load all students from database"""
     students = Student.query.all()
     return [(s.leetcode_username, s.name, s.register_number, s.year, s.section) 
             for s in students]
+
 
 async def fetch_leetcode_stats_async(username):
     """Asynchronously fetch LeetCode statistics."""
@@ -68,20 +72,38 @@ async def fetch_leetcode_stats_async(username):
     
     return {"easy": 0, "medium": 0, "hard": 0, "total": 0}
 
+
 async def fetch_all_stats_async():
-    """Fetch stats for all students concurrently."""
+    """Fetch stats for all students in small batches to prevent OOM."""
     students = load_students_from_db()
     
-    connector = aiohttp.TCPConnector(limit=50)
+    # Process in batches of 20 students
+    batch_size = 20
+    all_results = []
+    
+    connector = aiohttp.TCPConnector(limit=10)  # Only 10 concurrent connections
     timeout = aiohttp.ClientTimeout(total=10)
     
     async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
-        tasks = []
-        for username, name, roll_no, year, section in students:
-            task = fetch_student_stats_async(username, name, roll_no, year, section, session)
-            tasks.append(task)
-        
-        return await asyncio.gather(*tasks)
+        for i in range(0, len(students), batch_size):
+            batch = students[i:i+batch_size]
+            print(f"Processing batch {i//batch_size + 1}/{(len(students) + batch_size - 1)//batch_size}")
+            
+            tasks = []
+            for username, name, roll_no, year, section in batch:
+                task = fetch_student_stats_async(username, name, roll_no, year, section, session)
+                tasks.append(task)
+            
+            # Process this batch
+            batch_results = await asyncio.gather(*tasks)
+            all_results.extend(batch_results)
+            
+            # Small delay between batches to prevent overwhelming the server
+            if i + batch_size < len(students):
+                await asyncio.sleep(0.5)
+    
+    return all_results
+
 
 async def fetch_student_stats_async(username, name, roll_no, year, section, session):
     """Fetch a student's stats using an existing session."""
@@ -135,6 +157,7 @@ async def fetch_student_stats_async(username, name, roll_no, year, section, sess
         "hard": stats["hard"],
         "total": stats["total"]
     }
+
 
 async def fetch_detailed_leetcode_stats(username):
     """Fetch comprehensive LeetCode statistics for a student"""
@@ -195,13 +218,16 @@ async def fetch_detailed_leetcode_stats(username):
         "profile_url": f"https://leetcode.com/u/{username}/"
     }
 
+
 def get_all_stats():
     """Synchronous wrapper to get all stats using asyncio."""
     return asyncio.run(fetch_all_stats_async())
 
+
 @app.route("/")
 def index():
     return render_template("index.html", available_years=get_available_year_sections())
+
 
 @app.route("/health")
 def health_check():
@@ -218,6 +244,7 @@ def health_check():
             "status": "unhealthy",
             "error": str(e)
         }, 500
+
 
 @app.route("/student/<register_number>")
 def student_profile(register_number):
@@ -243,6 +270,7 @@ def student_profile(register_number):
         flash(f'Error fetching student stats: {str(e)}', 'error')
         return redirect(url_for('index'))
 
+
 @app.route("/admin")
 def admin():
     """Admin panel for HoD to upload Excel files"""
@@ -254,6 +282,7 @@ def admin():
     years_data = db.session.query(Student.year, db.func.count(Student.id)).group_by(Student.year).all()
     
     return render_template("admin.html", logs=logs, student_count=student_count, years_data=years_data)
+
 
 @app.route("/admin/login", methods=['GET', 'POST'])
 def admin_login():
@@ -269,12 +298,14 @@ def admin_login():
     
     return render_template("admin_login.html")
 
+
 @app.route("/admin/logout")
 def admin_logout():
     """Logout HoD"""
     session.pop('hod_authenticated', None)
     flash('Logged out successfully.', 'success')
     return redirect(url_for('index'))
+
 
 @app.route("/admin/upload", methods=['POST'])
 def upload_excel():
@@ -433,6 +464,7 @@ def upload_excel():
         print("=" * 50)
         return jsonify({'success': False, 'message': f'Error processing file: {str(e)}'}), 500
 
+
 @app.route("/admin/students")
 def admin_students():
     """View and manage all students with pagination"""
@@ -483,6 +515,7 @@ def admin_students():
         year_filter=year_filter,
         section_filter=section_filter
     )
+
 
 @app.route("/admin/student/edit/<int:student_id>", methods=['GET', 'POST'])
 def admin_edit_student(student_id):
@@ -539,6 +572,7 @@ def admin_edit_student(student_id):
     
     return render_template("admin_edit_student.html", student=student)
 
+
 @app.route("/admin/student/delete/<int:student_id>", methods=['POST'])
 def admin_delete_student(student_id):
     """Delete a student"""
@@ -563,6 +597,17 @@ def admin_delete_student(student_id):
             'success': False,
             'message': f'Error deleting student: {str(e)}'
         }), 500
+
+
+@app.route("/admin/logs")
+def admin_logs():
+    """View upload logs"""
+    if not session.get('hod_authenticated'):
+        return redirect(url_for('admin_login'))
+    
+    logs = UploadLog.query.order_by(UploadLog.upload_time.desc()).limit(50).all()
+    return render_template("admin_logs.html", logs=logs)
+
 
 @app.route("/download")
 def download_csv():
@@ -591,6 +636,7 @@ def download_csv():
     response.headers["Content-type"] = "text/csv"
     
     return response
+
 
 @app.route("/api/stats")
 def api_stats():

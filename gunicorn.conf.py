@@ -1,6 +1,10 @@
-bind = "0.0.0.0:8000"
-workers = 4
+bind = "0.0.0.0:10000"
+workers = 1
 worker_class = "gevent"
-worker_connections = 100
-timeout = 30
-keepalive = 2
+worker_connections = 20  # Further reduced
+timeout = 900  # 15 minutes for large student lists
+keepalive = 5
+max_requests = 25  # Restart worker more frequently
+max_requests_jitter = 5
+graceful_timeout = 120
+worker_tmp_dir = '/dev/shm'  # Use shared memory for worker files (faster on Render)
