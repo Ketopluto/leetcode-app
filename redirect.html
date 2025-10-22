@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Site Relocated</title>
+  <style>
+    :root {
+      --primary: #0078ff;
+      --bg: #f5f7fa;
+      --text: #2c3e50;
+      --card-bg: #ffffff;
+      --shadow: rgba(0, 0, 0, 0.08);
+    }
+
+    body {
+      margin: 0;
+      font-family: "Inter", system-ui, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+    }
+
+    .card {
+      background: var(--card-bg);
+      padding: 2.5rem 3rem;
+      border-radius: 12px;
+      box-shadow: 0 6px 18px var(--shadow);
+      text-align: center;
+      max-width: 480px;
+      animation: fadeIn 0.6s ease-out;
+    }
+
+    h1 {
+      margin-top: 0;
+      color: var(--primary);
+      font-size: 1.8rem;
+    }
+
+    p {
+      margin: 0.6rem 0;
+      line-height: 1.5;
+    }
+
+    a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>Site Relocated</h1>
+    <p>The website has been moved to a new domain.</p>
+    <p>Visitors will be redirected automatically in a moment.</p>
+    <p>If redirection does not occur, <a id="redirect-link" href="#">click here</a>.</p>
+  </div>
+
+  <script>
+    const newURL = "https://leetcode-app-mauve.vercel.app/";
+    const path = window.location.pathname;
+    const query = window.location.search;
+    const destination = newURL + path + query;
+
+    document.getElementById("redirect-link").href = destination;
+    setTimeout(() => window.location.replace(destination), 1200);
+  </script>
+
+</body>
+</html>
