@@ -64,7 +64,7 @@ async def _fetch_student_with_session(username, name, roll_no, year, section, se
     if not uname or uname.lower() == "higher studies":
         stats = {"easy": 0, "medium": 0, "hard": 0, "total": 0}
     else:
-        url = f"https://leetcode-api-faisalshohag.vercel.app/{uname}"
+        url = f"https://alfa-leetcode-api-blush.vercel.app/{uname}/solved"
         stats = {"easy": 0, "medium": 0, "hard": 0, "total": 0}
         for attempt in range(attempts):
             try:
@@ -75,7 +75,7 @@ async def _fetch_student_with_session(username, name, roll_no, year, section, se
                             "easy": data.get("easySolved", 0),
                             "medium": data.get("mediumSolved", 0),
                             "hard": data.get("hardSolved", 0),
-                            "total": data.get("totalSolved", 0),
+                            "total": data.get("solvedProblem", 0),
                         }
                         break
                     else:
@@ -233,28 +233,68 @@ async def _fetch_detailed_with_session(username, session, timeout_seconds=10):
     if not username or username.lower() == "higher studies":
         return None
 
-    url = f"https://leetcode-api-faisalshohag.vercel.app/{username}"
+    base_url = "https://alfa-leetcode-api-blush.vercel.app"
+    profile_url = f"{base_url}/{username}"
+    solved_url = f"{base_url}/{username}/solved"
+    submission_url = f"{base_url}/{username}/submission?limit=20"
+    
     timeout = aiohttp.ClientTimeout(total=timeout_seconds)
     try:
         async with aiohttp.ClientSession(timeout=timeout) as s:
-            async with s.get(url) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    recent_submissions = data.get("recentSubmissions", [])[:20]
-                    return {
-                        "username": username,
-                        "totalSolved": data.get("totalSolved", 0),
-                        "easySolved": data.get("easySolved", 0),
-                        "mediumSolved": data.get("mediumSolved", 0),
-                        "hardSolved": data.get("hardSolved", 0),
-                        "totalSubmissions": data.get("totalSubmissions", []),
-                        "recentSubmissions": recent_submissions,
-                        "ranking": data.get("ranking", 0),
-                        "contributionPoint": data.get("contributionPoint", 0),
-                        "reputation": data.get("reputation", 0),
-                        "acceptance_rate": data.get("acceptanceRate", 0),
-                        "profile_url": f"https://leetcode.com/u/{username}/"
-                    }
+            # Fetch all endpoints concurrently
+            results = await asyncio.gather(
+                s.get(profile_url),
+                s.get(solved_url),
+                s.get(submission_url),
+                return_exceptions=True
+            )
+            
+            profile_data = {}
+            solved_data = {}
+            submission_data = {}
+            
+            # Process profile
+            if isinstance(results[0], aiohttp.ClientResponse) and results[0].status == 200:
+                profile_data = await results[0].json()
+            
+            # Process solved
+            if isinstance(results[1], aiohttp.ClientResponse) and results[1].status == 200:
+                solved_data = await results[1].json()
+            
+            # Process submissions
+            if isinstance(results[2], aiohttp.ClientResponse) and results[2].status == 200:
+                submission_data = await results[2].json()
+            
+            # Calculate acceptance rate from acSubmissionNum and totalSubmissionNum
+            acceptance_rate = 0
+            total_submissions_data = solved_data.get("totalSubmissionNum", [])
+            ac_submissions_data = solved_data.get("acSubmissionNum", [])
+            
+            all_total = next((x for x in total_submissions_data if x.get('difficulty') == 'All'), None)
+            all_ac = next((x for x in ac_submissions_data if x.get('difficulty') == 'All'), None)
+            
+            if all_total and all_ac:
+                total_sub_count = all_total.get('submissions', 0)
+                ac_sub_count = all_ac.get('submissions', 0)
+                if total_sub_count > 0:
+                    acceptance_rate = round((ac_sub_count / total_sub_count) * 100, 2)
+            
+            recent_submissions = submission_data.get("submission", [])[:20]
+            
+            return {
+                "username": username,
+                "totalSolved": solved_data.get("solvedProblem", 0),
+                "easySolved": solved_data.get("easySolved", 0),
+                "mediumSolved": solved_data.get("mediumSolved", 0),
+                "hardSolved": solved_data.get("hardSolved", 0),
+                "totalSubmissions": solved_data.get("totalSubmissionNum", []),
+                "recentSubmissions": recent_submissions,
+                "ranking": profile_data.get("ranking", 0),
+                "contributionPoint": 0,  # Not available in this API
+                "reputation": profile_data.get("reputation", 0),
+                "acceptance_rate": acceptance_rate,
+                "profile_url": f"https://leetcode.com/u/{username}/"
+            }
     except Exception as e:
         print(f"Error fetching detailed stats for {username}: {e}")
     return None
