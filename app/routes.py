@@ -62,10 +62,11 @@ async def _fetch_student_with_session(username, name, roll_no, year, section, se
     """Internal: fetch one student's stats using provided aiohttp session."""
     uname = (username or "").strip()
     if not uname or uname.lower() == "higher studies":
-        stats = {"easy": 0, "medium": 0, "hard": 0, "total": 0, "error": "placeholder_username"}
+        # Placeholder username - not an error, just skip
+        stats = {"easy": 0, "medium": 0, "hard": 0, "total": 0, "user_error": None, "temp_error": None}
     else:
         url = f"https://alfa-leetcode-api-blush.vercel.app/{uname}/solved"
-        stats = {"easy": 0, "medium": 0, "hard": 0, "total": 0, "error": None}
+        stats = {"easy": 0, "medium": 0, "hard": 0, "total": 0, "user_error": None, "temp_error": None}
         for attempt in range(attempts):
             try:
                 async with session.get(url) as resp:
@@ -74,41 +75,42 @@ async def _fetch_student_with_session(username, name, roll_no, year, section, se
                         # Check if the API returned an error (user doesn't exist)
                         # The LeetCode API returns HTTP 200 even for errors, but includes an "errors" array
                         if "errors" in data:
-                            # User doesn't exist on LeetCode
+                            # User doesn't exist on LeetCode - this IS a user error
                             error_msg = "user_not_found"
                             if len(data["errors"]) > 0:
                                 error_msg = data["errors"][0].get("message", "user_not_found")
                             stats = {
                                 "easy": 0, "medium": 0, "hard": 0, "total": 0,
-                                "error": error_msg
+                                "user_error": error_msg,  # Shows warning icon
+                                "temp_error": None
                             }
                             print(f"[LeetCode API] User '{uname}' not found: {error_msg}")
                             break
                         else:
-                            # Valid user data
+                            # Valid user data - success!
                             stats = {
                                 "easy": data.get("easySolved", 0),
                                 "medium": data.get("mediumSolved", 0),
                                 "hard": data.get("hardSolved", 0),
                                 "total": data.get("solvedProblem", 0),
-                                "error": None
+                                "user_error": None,
+                                "temp_error": None
                             }
                             break
                     else:
-                        # non-200: break or retry depending on status
-                        # for now, retry on server errors, otherwise give up
+                        # non-200: this is a temporary server issue, not a user error
                         if 500 <= resp.status < 600:
                             # server error: let it retry
-                            stats["error"] = f"server_error_{resp.status}"
+                            stats["temp_error"] = f"server_error_{resp.status}"
                         else:
-                            stats["error"] = f"http_error_{resp.status}"
+                            stats["temp_error"] = f"http_error_{resp.status}"
                             break
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 if attempt + 1 < attempts:
                     await asyncio.sleep(0.15 * (attempt + 1))
                 else:
-                    # final attempt failed -> keep zeros
-                    stats["error"] = f"network_error: {str(e)}"
+                    # final attempt failed - this is a TEMPORARY error, not a user error
+                    stats["temp_error"] = f"network_error: {str(e)}"
 
     year_suffix = 'st' if year == 1 else 'nd' if year == 2 else 'rd' if year == 3 else 'th'
     year_str = f"{year}{year_suffix} Year"
@@ -126,7 +128,7 @@ async def _fetch_student_with_session(username, name, roll_no, year, section, se
         "medium": stats["medium"],
         "hard": stats["hard"],
         "total": stats["total"],
-        "fetch_error": stats.get("error"),
+        "fetch_error": stats.get("user_error"),  # Only user errors show warning icon
         "fetched_at": int(time.time())
     }
 
@@ -152,7 +154,7 @@ async def fetch_students_concurrent(students_to_fetch, concurrency=CONCURRENCY, 
                 try:
                     return await _fetch_student_with_session(username, name, roll, year, section, session)
                 except Exception as e:
-                    # return a default dict on error
+                    # return a default dict on error - this is a TEMPORARY error, not a user error
                     print(f"[LeetCode API] Exception fetching '{username}': {e}")
                     return {
                         "roll_no": roll,
@@ -166,7 +168,7 @@ async def fetch_students_concurrent(students_to_fetch, concurrency=CONCURRENCY, 
                         "medium": 0,
                         "hard": 0,
                         "total": 0,
-                        "fetch_error": f"exception: {str(e)}",
+                        "fetch_error": None,  # Don't show warning for temp errors
                         "fetched_at": int(time.time())
                     }
 
