@@ -362,14 +362,12 @@ let tipInterval = null;
 function showLoading() {
   const loadingScreen = document.getElementById('loading-screen');
   const spinnerContainer = document.getElementById('spinner-container');
-  const funFactElement = document.getElementById('fun-fact');
   const tipTextElement = document.getElementById('tip-text');
   const progressBar = document.getElementById('progress-bar');
 
   loadingScreen.classList.remove('fade-out');
   loadingScreen.style.display = 'flex';
   spinnerContainer.innerHTML = getRandomSpinner();
-  funFactElement.textContent = getRandomFunFact();
 
   // Set initial tip
   if (tipTextElement) {

@@ -1,13 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LeetCode Statistics Dashboard</title>
   <link rel="stylesheet" href="static/css/critical.css">
   <link rel="preload" href="static/css/non-critical.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="static/css/non-critical.css"></noscript>
+  <noscript>
+    <link rel="stylesheet" href="static/css/non-critical.css">
+  </noscript>
 </head>
+
 <body>
   <!-- Navigation Bar -->
   <nav class="navbar">
@@ -36,8 +40,8 @@
       <div class="progress-bar-container">
         <div class="progress-bar" id="progress-bar"></div>
       </div>
-      
-      <!-- Tips Carousel -->
+
+      <!-- Pro Tips Section -->
       <div class="tips-section">
         <div class="tips-header">
           <span class="tips-icon">💡</span>
@@ -45,11 +49,13 @@
         </div>
         <p class="tip-text" id="tip-text">Loading tip...</p>
       </div>
-      
-      <!-- Fun Fact Footer -->
-      <div id="content-display">
-        <img id="content-image" style="display: none;" />
-        <p class="fun-fact" id="fun-fact"></p>
+
+      <!-- Motivational Footer -->
+      <div class="motivational-footer">
+        <span class="code-badge">
+          <span class="badge-icon">🎯</span>
+          <span class="badge-text">Keep grinding!</span>
+        </span>
       </div>
     </div>
   </div>
@@ -134,4 +140,5 @@
 
   <script src="static/js/main.js"></script>
 </body>
+
 </html>
