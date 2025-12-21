@@ -42,6 +42,25 @@ const funFacts = [
   "🏃 The first computer virus was created in 1983!"
 ];
 
+// LeetCode Pro Tips for loading screen
+const leetcodeTips = [
+  "Start with Easy problems to build confidence, then gradually move to Medium",
+  "Practice the Blind 75 list - it covers the most important patterns",
+  "Understand time & space complexity before jumping to code",
+  "Draw out examples on paper - it helps visualize the problem",
+  "Learn patterns: Two Pointers, Sliding Window, Binary Search, DFS/BFS",
+  "Always think about edge cases: empty input, single element, duplicates",
+  "Try to solve without hints first, even if it takes longer",
+  "Review your solutions - there's always room for optimization",
+  "Consistency beats intensity: 1 problem daily > 10 problems weekly",
+  "Don't memorize solutions - understand the underlying patterns",
+  "Master arrays and strings first - they're the foundation",
+  "Hash maps are your best friend for O(1) lookups",
+  "Stuck? Break the problem into smaller sub-problems",
+  "Practice explaining your approach out loud - great for interviews",
+  "Read the constraints - they often hint at the expected complexity"
+];
+
 // Spinner types
 const spinnerTypes = [
   'circle',
@@ -331,17 +350,40 @@ function getRandomFunFact() {
   return funFacts[Math.floor(Math.random() * funFacts.length)];
 }
 
+// Get random tip
+function getRandomTip() {
+  return leetcodeTips[Math.floor(Math.random() * leetcodeTips.length)];
+}
+
+// Tip cycling interval reference
+let tipInterval = null;
+
 // Show loading screen with random spinner
 function showLoading() {
   const loadingScreen = document.getElementById('loading-screen');
   const spinnerContainer = document.getElementById('spinner-container');
   const funFactElement = document.getElementById('fun-fact');
+  const tipTextElement = document.getElementById('tip-text');
   const progressBar = document.getElementById('progress-bar');
 
   loadingScreen.classList.remove('fade-out');
   loadingScreen.style.display = 'flex';
   spinnerContainer.innerHTML = getRandomSpinner();
   funFactElement.textContent = getRandomFunFact();
+
+  // Set initial tip
+  if (tipTextElement) {
+    tipTextElement.textContent = getRandomTip();
+
+    // Cycle tips every 3 seconds
+    if (tipInterval) clearInterval(tipInterval);
+    tipInterval = setInterval(() => {
+      tipTextElement.style.animation = 'none';
+      tipTextElement.offsetHeight; // Trigger reflow
+      tipTextElement.textContent = getRandomTip();
+      tipTextElement.style.animation = 'tipFade 0.5s ease-in-out';
+    }, 3000);
+  }
 
   // Reset progress bar
   progressBar.style.animation = 'none';
@@ -356,6 +398,12 @@ function showLoading() {
 function hideLoading() {
   const loadingScreen = document.getElementById('loading-screen');
   loadingScreen.classList.add('fade-out');
+
+  // Clear tip cycling interval
+  if (tipInterval) {
+    clearInterval(tipInterval);
+    tipInterval = null;
+  }
 
   setTimeout(() => {
     loadingScreen.style.display = 'none';
