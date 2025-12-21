@@ -73,10 +73,10 @@ async def _fetch_student_with_session(username, name, roll_no, year, section, se
                         data = await resp.json()
                         # Check if the API returned an error (user doesn't exist)
                         # The LeetCode API returns HTTP 200 even for errors, but includes an "errors" array
-                        if "errors" in data or data.get("matchedUser") is None:
+                        if "errors" in data:
                             # User doesn't exist on LeetCode
                             error_msg = "user_not_found"
-                            if "errors" in data and len(data["errors"]) > 0:
+                            if len(data["errors"]) > 0:
                                 error_msg = data["errors"][0].get("message", "user_not_found")
                             stats = {
                                 "easy": 0, "medium": 0, "hard": 0, "total": 0,
