@@ -332,6 +332,15 @@ tbody tr.highlight:hover {
   background-color: #fde68a !important;
 }
 
+/* Error row for invalid LeetCode usernames */
+tbody tr.error-row {
+  background-color: #fee2e2 !important;
+}
+
+tbody tr.error-row:hover {
+  background-color: #fecaca !important;
+}
+
 /* Download Section */
 .download-section {
   text-align: center;

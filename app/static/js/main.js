@@ -54,11 +54,257 @@ const spinnerTypes = [
   'bounce'
 ];
 
+function getRandomSpinner() {
+  const type = spinnerTypes[Math.floor(Math.random() * spinnerTypes.length)];
+
+  switch (type) {
+    case 'circle':
+      return '<div class="spinner-circle"></div>';
+    case 'dots':
+      return '<div class="spinner-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+    case 'pulse':
+      return '<div class="spinner-pulse"></div>';
+    case 'squares':
+      return '<div class="spinner-squares">' + '<div class="square"></div>'.repeat(9) + '</div>';
+    case 'orbit':
+      return '<div class="spinner-orbit"><div class="orbit-circle"></div><div class="orbit-circle"></div></div>';
+    case 'bars':
+      return '<div class="spinner-bars">' + '<div class="bar"></div>'.repeat(5) + '</div>';
+    case 'ring':
+      return '<div class="spinner-ring"></div>';
+    case 'bounce':
+      return '<div class="spinner-bounce"><div class="ball"></div><div class="ball"></div><div class="ball"></div></div>';
+    default:
+      return '<div class="spinner-circle"></div>';
+  }
+}
+
+// API endpoints for variety (text + images)
+const contentAPIs = [
+  // Text-based facts
+  {
+    name: 'useless-facts',
+    type: 'text',
+    url: 'https://uselessfacts.jsph.pl/api/v2/facts/random',
+    parse: (data) => ({
+      text: `💡 ${data.text}`,
+      image: null
+    })
+  },
+  {
+    name: 'cat-facts',
+    type: 'text',
+    url: 'https://catfact.ninja/fact',
+    parse: (data) => ({
+      text: `🐱 ${data.fact}`,
+      image: null
+    })
+  },
+  {
+    name: 'quotes',
+    type: 'text',
+    url: 'https://api.quotable.io/random',
+    parse: (data) => ({
+      text: `💬 "${data.content}" - ${data.author}`,
+      image: null
+    })
+  },
+  {
+    name: 'programming-jokes',
+    type: 'text',
+    url: 'https://official-joke-api.appspot.com/random_joke',
+    parse: (data) => ({
+      text: `😄 ${data.setup} ${data.punchline}`,
+      image: null
+    })
+  },
+  {
+    name: 'advice',
+    type: 'text',
+    url: 'https://api.adviceslip.com/advice',
+    parse: (data) => ({
+      text: `💭 ${data.slip.advice}`,
+      image: null
+    })
+  },
+
+  // Image-based content (Art Institute of Chicago)
+  {
+    name: 'art-chicago',
+    type: 'image',
+    url: () => `https://api.artic.edu/api/v1/artworks?page=${Math.floor(Math.random() * 100) + 1}&limit=1`,
+    parse: (data) => {
+      const artwork = data.data[0];
+      const imageId = artwork.image_id;
+
+      return {
+        text: `🎨 "${artwork.title}" by ${artwork.artist_display}`,
+        image: imageId ? `https://www.artic.edu/iiif/2/${imageId}/full/400,/0/default.jpg` : null
+      };
+    }
+  },
+
+  // Dog images with facts
+  {
+    name: 'dog-images',
+    type: 'image',
+    url: 'https://dog.ceo/api/breeds/image/random',
+    parse: (data) => ({
+      text: '🐶 Random dog breed - Dogs have been humans\' best friends for over 15,000 years!',
+      image: data.message
+    })
+  },
+
+  // Cat images
+  {
+    name: 'cat-images',
+    type: 'image',
+    url: 'https://api.thecatapi.com/v1/images/search',
+    parse: (data) => ({
+      text: '🐱 A majestic feline - Cats spend 70% of their lives sleeping!',
+      image: data[0].url
+    })
+  }
+];
+
+// Fallback content if all APIs fail
+const fallbackContent = {
+  text: "💡 The first computer bug was an actual moth found in 1947!",
+  image: null
+};
+
+// Fetch random content from mixed APIs
+async function getRandomContent() {
+  // Randomly select an API
+  const randomAPI = contentAPIs[Math.floor(Math.random() * contentAPIs.length)];
+
+  try {
+    const url = typeof randomAPI.url === 'function' ? randomAPI.url() : randomAPI.url;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return randomAPI.parse(data);
+  } catch (error) {
+    console.error(`Error fetching from ${randomAPI.name}:`, error);
+    return fallbackContent;
+  }
+}
+
+// Display content (text and/or image)
+function displayContent(content) {
+  const textElement = document.getElementById('fun-fact');
+  const imageElement = document.getElementById('content-image');
+
+  // Always show text
+  textElement.textContent = content.text;
+  textElement.style.display = 'block';
+
+  // Show image if available
+  if (content.image) {
+    imageElement.src = content.image;
+    imageElement.style.display = 'block';
+    imageElement.onerror = function () {
+      // Hide image if it fails to load
+      this.style.display = 'none';
+    };
+  } else {
+    imageElement.style.display = 'none';
+  }
+}
+
+// Show loading screen (updated to handle async content)
+async function showLoading() {
+  const loadingScreen = document.getElementById('loading-screen');
+  const spinnerContainer = document.getElementById('spinner-container');
+  const progressBar = document.getElementById('progress-bar');
+
+  loadingScreen.classList.remove('fade-out');
+  loadingScreen.style.display = 'flex';
+  spinnerContainer.innerHTML = getRandomSpinner();
+
+  // Fetch and display random content
+  const content = await getRandomContent();
+  displayContent(content);
+
+  // Reset progress bar
+  progressBar.style.animation = 'none';
+  setTimeout(() => {
+    progressBar.style.animation = 'progress 3s ease-in-out forwards';
+  }, 10);
+
+  document.getElementById('mainContent').style.display = 'none';
+}
+
+// Hide loading screen
+function hideLoading() {
+  const loadingScreen = document.getElementById('loading-screen');
+  loadingScreen.classList.add('fade-out');
+
+  setTimeout(() => {
+    loadingScreen.style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+  }, 500);
+}
+
+// Rest of your existing functions (buildTable, buildLeaderboard, etc.)
+// ... keep everything else as is ...
+
+// Load data from API
+function loadData(year = '') {
+  showLoading();
+
+  fetch('/api/stats' + (year ? '?year=' + encodeURIComponent(year) : ''))
+    .then(response => response.json())
+    .then(data => {
+      console.log('API Response:', data);
+
+      buildTable(data.results);
+      buildLeaderboard(data.results);
+      updateStatsOverview(data.results);
+      document.getElementById('downloadLink').href = '/download' + (year ? '?year=' + encodeURIComponent(year) : '');
+
+      // Minimum loading time for better UX
+      setTimeout(() => {
+        hideLoading();
+      }, 1500);
+    })
+    .catch(error => {
+      console.error('Error fetching data:', error);
+      setTimeout(() => {
+        hideLoading();
+      }, 1000);
+    });
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function () {
+  // Handle year form submission
+  document.getElementById('yearForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const selectedYear = document.getElementById('year').value;
+    loadData(selectedYear);
+  });
+
+  // Auto-load first year to avoid timeout
+  const firstYear = document.getElementById('year').options[1]?.value;
+  if (firstYear) {
+    document.getElementById('year').value = firstYear;
+    loadData(firstYear);
+  } else {
+    hideLoading();
+    document.getElementById('tableContainer').innerHTML = '<p style="text-align: center; padding: 40px; color: #718096;">No student data available.</p>';
+  }
+});
+
 // Get random spinner
 function getRandomSpinner() {
   const type = spinnerTypes[Math.floor(Math.random() * spinnerTypes.length)];
-  
-  switch(type) {
+
+  switch (type) {
     case 'circle':
       return '<div class="spinner-circle"></div>';
     case 'dots':
@@ -91,18 +337,18 @@ function showLoading() {
   const spinnerContainer = document.getElementById('spinner-container');
   const funFactElement = document.getElementById('fun-fact');
   const progressBar = document.getElementById('progress-bar');
-  
+
   loadingScreen.classList.remove('fade-out');
   loadingScreen.style.display = 'flex';
   spinnerContainer.innerHTML = getRandomSpinner();
   funFactElement.textContent = getRandomFunFact();
-  
+
   // Reset progress bar
   progressBar.style.animation = 'none';
   setTimeout(() => {
     progressBar.style.animation = 'progress 3s ease-in-out forwards';
   }, 10);
-  
+
   document.getElementById('mainContent').style.display = 'none';
 }
 
@@ -110,7 +356,7 @@ function showLoading() {
 function hideLoading() {
   const loadingScreen = document.getElementById('loading-screen');
   loadingScreen.classList.add('fade-out');
-  
+
   setTimeout(() => {
     loadingScreen.style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
@@ -133,14 +379,30 @@ function buildTable(results) {
                   </tr>
                 </thead>
                 <tbody>`;
-  
+
   results.forEach(row => {
     const yearDisplay = row.year_display || row.year;
-    
-    html += `<tr ${row.username === 'higher studies' ? 'class="highlight"' : ''}>
+    const hasError = row.fetch_error;
+    const isHigherStudies = row.username === 'higher studies';
+
+    // Determine row class based on error status
+    let rowClass = '';
+    if (isHigherStudies) {
+      rowClass = 'class="highlight"';
+    } else if (hasError) {
+      rowClass = 'class="error-row"';
+    }
+
+    // Show error indicator for invalid usernames
+    let usernameDisplay = row.username;
+    if (hasError && !isHigherStudies) {
+      usernameDisplay = `<span title="Error: ${row.fetch_error}" style="color: #e53e3e; cursor: help;">⚠️ ${row.username}</span>`;
+    }
+
+    html += `<tr ${rowClass}>
                <td>${row.roll_no}</td>
                <td><a href="/student/${row.roll_no}" class="student-name-link">${row.actual_name}</a></td>
-               <td>${row.username}</td>
+               <td>${usernameDisplay}</td>
                <td>${yearDisplay}</td>
                <td>${row.easy}</td>
                <td>${row.medium}</td>
@@ -148,7 +410,7 @@ function buildTable(results) {
                <td><strong>${row.total}</strong></td>
              </tr>`;
   });
-  
+
   html += `</tbody></table>`;
   document.getElementById('tableContainer').innerHTML = html;
 }
@@ -157,7 +419,7 @@ function buildTable(results) {
 function buildLeaderboard(results) {
   const top5 = results.sort((a, b) => b.total - a.total).slice(0, 5);
   let html = '';
-  
+
   top5.forEach((solver, index) => {
     const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🏅';
     const yearDisplay = solver.year_display || solver.year;
@@ -166,7 +428,7 @@ function buildLeaderboard(results) {
                <span><strong>${solver.total}</strong> problems</span>
              </li>`;
   });
-  
+
   document.getElementById('leaderboardList').innerHTML = html;
 }
 
@@ -175,10 +437,16 @@ function updateStatsOverview(results) {
   const totalUsers = results.length;
   const totalProblems = results.reduce((sum, user) => sum + user.total, 0);
   const avgProblems = totalUsers > 0 ? Math.round(totalProblems / totalUsers) : 0;
-  
+  const errorCount = results.filter(user => user.fetch_error && user.username !== 'higher studies').length;
+
   animateCounter('totalUsers', totalUsers);
   animateCounter('totalProblems', totalProblems);
   animateCounter('avgProblems', avgProblems);
+
+  // Log error count for debugging
+  if (errorCount > 0) {
+    console.warn(`⚠️ ${errorCount} users have invalid LeetCode profiles (showing 0 scores)`);
+  }
 }
 
 // Animate counter
@@ -189,12 +457,12 @@ function animateCounter(elementId, targetValue) {
   const stepValue = targetValue / steps;
   let currentValue = 0;
   let currentStep = 0;
-  
+
   const interval = setInterval(() => {
     currentValue += stepValue;
     currentStep++;
     element.textContent = Math.round(currentValue);
-    
+
     if (currentStep >= steps) {
       element.textContent = targetValue;
       clearInterval(interval);
@@ -205,19 +473,19 @@ function animateCounter(elementId, targetValue) {
 // Load data from API
 function loadData(year = '') {
   showLoading();
-  
+
   fetch('/api/stats' + (year ? '?year=' + encodeURIComponent(year) : ''))
     .then(response => response.json())
     .then(data => {
       console.log('API Response:', data);
       console.log('Selected filter:', year);
       console.log('Results count:', data.results.length);
-      
+
       buildTable(data.results);
       buildLeaderboard(data.results);
       updateStatsOverview(data.results);
       document.getElementById('downloadLink').href = '/download' + (year ? '?year=' + encodeURIComponent(year) : '');
-      
+
       // Minimum loading time for better UX
       setTimeout(() => {
         hideLoading();
@@ -232,24 +500,24 @@ function loadData(year = '') {
 }
 
 // Initialize
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
   // Handle year form submission
-  document.getElementById('yearForm').addEventListener('submit', function(e) {
+  document.getElementById('yearForm').addEventListener('submit', function (e) {
     e.preventDefault();
     const selectedYear = document.getElementById('year').value;
     loadData(selectedYear);
   });
-  
+
   // Initial load
   loadData();
 });
 
 // Client-side table search (filter as you type)
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
   // Check if we're on a page with a table
   const tableContainer = document.getElementById('tableContainer');
   if (!tableContainer) return;
-  
+
   // Create search input above table
   const tableSection = document.querySelector('.table-section');
   if (tableSection) {
@@ -263,19 +531,19 @@ document.addEventListener('DOMContentLoaded', function() {
       <span id="tableCount" style="color: #718096; font-size: 14px; min-width: 150px;"></span>
     `;
     tableSection.insertBefore(searchBar, tableContainer);
-    
+
     // Add search functionality
     const searchInput = document.getElementById('tableSearch');
     const tableCount = document.getElementById('tableCount');
-    
-    searchInput.addEventListener('input', function(e) {
+
+    searchInput.addEventListener('input', function (e) {
       const searchTerm = e.target.value.toLowerCase();
       const table = tableContainer.querySelector('table');
       if (!table) return;
-      
+
       const rows = table.querySelectorAll('tbody tr');
       let visibleCount = 0;
-      
+
       rows.forEach(row => {
         const text = row.textContent.toLowerCase();
         if (text.includes(searchTerm)) {
@@ -285,10 +553,10 @@ document.addEventListener('DOMContentLoaded', function() {
           row.style.display = 'none';
         }
       });
-      
+
       tableCount.textContent = `Showing ${visibleCount} of ${rows.length} students`;
     });
-    
+
     // Initial count
     const initialRows = tableContainer.querySelectorAll('tbody tr').length;
     tableCount.textContent = `Showing ${initialRows} students`;

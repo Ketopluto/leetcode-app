@@ -62,36 +62,53 @@ async def _fetch_student_with_session(username, name, roll_no, year, section, se
     """Internal: fetch one student's stats using provided aiohttp session."""
     uname = (username or "").strip()
     if not uname or uname.lower() == "higher studies":
-        stats = {"easy": 0, "medium": 0, "hard": 0, "total": 0}
+        stats = {"easy": 0, "medium": 0, "hard": 0, "total": 0, "error": "placeholder_username"}
     else:
         url = f"https://alfa-leetcode-api-blush.vercel.app/{uname}/solved"
-        stats = {"easy": 0, "medium": 0, "hard": 0, "total": 0}
+        stats = {"easy": 0, "medium": 0, "hard": 0, "total": 0, "error": None}
         for attempt in range(attempts):
             try:
                 async with session.get(url) as resp:
                     if resp.status == 200:
                         data = await resp.json()
-                        stats = {
-                            "easy": data.get("easySolved", 0),
-                            "medium": data.get("mediumSolved", 0),
-                            "hard": data.get("hardSolved", 0),
-                            "total": data.get("solvedProblem", 0),
-                        }
-                        break
+                        # Check if the API returned an error (user doesn't exist)
+                        # The LeetCode API returns HTTP 200 even for errors, but includes an "errors" array
+                        if "errors" in data or data.get("matchedUser") is None:
+                            # User doesn't exist on LeetCode
+                            error_msg = "user_not_found"
+                            if "errors" in data and len(data["errors"]) > 0:
+                                error_msg = data["errors"][0].get("message", "user_not_found")
+                            stats = {
+                                "easy": 0, "medium": 0, "hard": 0, "total": 0,
+                                "error": error_msg
+                            }
+                            print(f"[LeetCode API] User '{uname}' not found: {error_msg}")
+                            break
+                        else:
+                            # Valid user data
+                            stats = {
+                                "easy": data.get("easySolved", 0),
+                                "medium": data.get("mediumSolved", 0),
+                                "hard": data.get("hardSolved", 0),
+                                "total": data.get("solvedProblem", 0),
+                                "error": None
+                            }
+                            break
                     else:
                         # non-200: break or retry depending on status
                         # for now, retry on server errors, otherwise give up
                         if 500 <= resp.status < 600:
                             # server error: let it retry
-                            pass
+                            stats["error"] = f"server_error_{resp.status}"
                         else:
+                            stats["error"] = f"http_error_{resp.status}"
                             break
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 if attempt + 1 < attempts:
                     await asyncio.sleep(0.15 * (attempt + 1))
                 else:
                     # final attempt failed -> keep zeros
-                    pass
+                    stats["error"] = f"network_error: {str(e)}"
 
     year_suffix = 'st' if year == 1 else 'nd' if year == 2 else 'rd' if year == 3 else 'th'
     year_str = f"{year}{year_suffix} Year"
@@ -109,6 +126,7 @@ async def _fetch_student_with_session(username, name, roll_no, year, section, se
         "medium": stats["medium"],
         "hard": stats["hard"],
         "total": stats["total"],
+        "fetch_error": stats.get("error"),
         "fetched_at": int(time.time())
     }
 
@@ -135,6 +153,7 @@ async def fetch_students_concurrent(students_to_fetch, concurrency=CONCURRENCY, 
                     return await _fetch_student_with_session(username, name, roll, year, section, session)
                 except Exception as e:
                     # return a default dict on error
+                    print(f"[LeetCode API] Exception fetching '{username}': {e}")
                     return {
                         "roll_no": roll,
                         "actual_name": name,
@@ -147,6 +166,7 @@ async def fetch_students_concurrent(students_to_fetch, concurrency=CONCURRENCY, 
                         "medium": 0,
                         "hard": 0,
                         "total": 0,
+                        "fetch_error": f"exception: {str(e)}",
                         "fetched_at": int(time.time())
                     }
 
