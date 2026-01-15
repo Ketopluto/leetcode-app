@@ -100,3 +100,29 @@ class WeeklyReport(db.Model):
     def __repr__(self):
         return f'<WeeklyReport Year {self.year} - {self.report_date}>'
 
+
+class StatsSnapshot(db.Model):
+    """Weekly snapshot of student stats for delta calculation.
+    
+    Used to track how many problems each student solves per week
+    by comparing current stats to last week's snapshot.
+    """
+    __tablename__ = 'stats_snapshots'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('students.id'), nullable=False)
+    week_start = db.Column(db.DateTime, nullable=False)  # Monday of the week
+    easy_solved = db.Column(db.Integer, default=0)
+    medium_solved = db.Column(db.Integer, default=0)
+    hard_solved = db.Column(db.Integer, default=0)
+    total_solved = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    student = db.relationship('Student', backref=db.backref('snapshots', lazy='dynamic'))
+    
+    __table_args__ = (
+        db.Index('idx_snapshot_student_week', 'student_id', 'week_start'),
+    )
+    
+    def __repr__(self):
+        return f'<StatsSnapshot Student {self.student_id} Week {self.week_start}: {self.total_solved}>'

@@ -9,10 +9,10 @@ from typing import List, Dict, Optional
 from flask import render_template_string
 
 from app import db
-from app.models import Student, StudentStats, WeeklyReport
+from app.models import Student, StudentStats, WeeklyReport, StatsSnapshot
 
 # Configuration
-INCONSISTENT_THRESHOLD = 5  # < 5 problems = inconsistent solver
+INCONSISTENT_THRESHOLD = 5  # < 5 problems per week = inconsistent solver
 
 
 def get_week_boundaries(for_date: datetime = None) -> tuple:
@@ -31,14 +31,68 @@ def get_week_boundaries(for_date: datetime = None) -> tuple:
     return week_start, week_end
 
 
+def create_weekly_snapshots():
+    """
+    Take a snapshot of all students' current stats for this week.
+    Should be called at the start of each week (e.g., Monday cron job).
+    """
+    week_start = get_week_boundaries()[0]
+    created_count = 0
+    
+    for stats in StudentStats.query.all():
+        # Check if snapshot already exists for this week
+        existing = StatsSnapshot.query.filter_by(
+            student_id=stats.student_id,
+            week_start=week_start
+        ).first()
+        
+        if not existing:
+            snapshot = StatsSnapshot(
+                student_id=stats.student_id,
+                week_start=week_start,
+                easy_solved=stats.easy_solved,
+                medium_solved=stats.medium_solved,
+                hard_solved=stats.hard_solved,
+                total_solved=stats.total_solved
+            )
+            db.session.add(snapshot)
+            created_count += 1
+    
+    db.session.commit()
+    return created_count
+
+
+def get_weekly_delta(student_id: int, current_total: int) -> int:
+    """
+    Calculate how many problems a student solved this week.
+    Returns delta = current_total - last_week_snapshot.
+    If negative (shouldn't happen), returns 0.
+    """
+    week_start = get_week_boundaries()[0]
+    prev_week_start = week_start - timedelta(days=7)
+    
+    # Get previous week's snapshot
+    prev_snapshot = StatsSnapshot.query.filter_by(
+        student_id=student_id,
+        week_start=prev_week_start
+    ).first()
+    
+    if prev_snapshot:
+        delta = current_total - prev_snapshot.total_solved
+        return max(0, delta)  # Treat negative as 0
+    else:
+        # No previous snapshot - this is first week, use current total
+        return current_total
+
+
 def generate_report_for_year(year: int, section: str = None) -> WeeklyReport:
     """
     Generate a weekly report for a specific year (and optionally section).
     
-    Categories:
-    - Zero Solvers: Students with 0 problems solved
-    - Inconsistent: Students with < 5 problems solved (all-time)
-    - Active: Students with >= 5 problems solved
+    Categories (based on WEEKLY progress):
+    - Zero Solvers: 0 new problems this week
+    - Inconsistent: < 5 new problems this week
+    - Active: >= 5 new problems this week
     
     Note: "higher studies" students are excluded from reports.
     """
@@ -71,19 +125,24 @@ def generate_report_for_year(year: int, section: str = None) -> WeeklyReport:
         
         total = stats.total_solved if stats else 0
         
+        # Calculate weekly delta (problems solved this week)
+        weekly_delta = get_weekly_delta(student.id, total)
+        
         student_data = {
             "register_number": student.register_number,
             "name": student.name,
             "leetcode_username": student.leetcode_username,
             "total_solved": total,
+            "weekly_solved": weekly_delta,  # NEW: problems solved this week
             "easy": stats.easy_solved if stats else 0,
             "medium": stats.medium_solved if stats else 0,
             "hard": stats.hard_solved if stats else 0,
         }
         
-        if total == 0:
+        # Categorize based on WEEKLY progress, not all-time
+        if weekly_delta == 0:
             zero_solvers.append(student_data)
-        elif total < INCONSISTENT_THRESHOLD:
+        elif weekly_delta < INCONSISTENT_THRESHOLD:
             inconsistent_solvers.append(student_data)
         else:
             active_solvers.append(student_data)
@@ -122,15 +181,22 @@ def generate_report_for_year(year: int, section: str = None) -> WeeklyReport:
 
 
 def generate_all_weekly_reports() -> List[WeeklyReport]:
-    """Generate reports for all years"""
+    """
+    Generate reports for all years.
+    Creates snapshots first, then generates reports using weekly deltas.
+    """
+    # Step 1: Create snapshots for this week (for next week's delta calculation)
+    snapshot_count = create_weekly_snapshots()
+    
     reports = []
     
-    # Get unique year/section combinations
+    # Step 2: Get unique year/section combinations
     year_sections = db.session.query(
         Student.year,
         Student.section
     ).distinct().all()
     
+    # Step 3: Generate reports for each group
     for year, section in year_sections:
         report = generate_report_for_year(year, section)
         if report:
@@ -197,7 +263,7 @@ def get_report_email_html(report: WeeklyReport) -> str:
         <h3 class="zero">Zero Solvers ({{ zero_solvers|length }} students)</h3>
     </div>
     <div class="alert alert-danger">
-        These students have not solved any problems on LeetCode.
+        These students have not solved any problems THIS WEEK.
     </div>
     <table>
         <tr><th>Register No</th><th>Name</th><th>LeetCode Username</th></tr>
@@ -212,18 +278,16 @@ def get_report_email_html(report: WeeklyReport) -> str:
         <h3 class="inconsistent">Inconsistent Solvers ({{ inconsistent_solvers|length }} students)</h3>
     </div>
     <div class="alert alert-warning">
-        These students have solved fewer than {{ threshold }} problems.
+        These students have solved fewer than {{ threshold }} problems THIS WEEK.
     </div>
     <table>
-        <tr><th>Register No</th><th>Name</th><th>LeetCode</th><th>Easy</th><th>Medium</th><th>Hard</th><th>Total</th></tr>
+        <tr><th>Register No</th><th>Name</th><th>LeetCode</th><th>This Week</th><th>All-Time</th></tr>
         {% for s in inconsistent_solvers %}
         <tr>
             <td>{{ s.register_number }}</td>
             <td>{{ s.name }}</td>
             <td>{{ s.leetcode_username }}</td>
-            <td>{{ s.easy }}</td>
-            <td>{{ s.medium }}</td>
-            <td>{{ s.hard }}</td>
+            <td><strong>{{ s.weekly_solved }}</strong></td>
             <td>{{ s.total_solved }}</td>
         </tr>
         {% endfor %}
