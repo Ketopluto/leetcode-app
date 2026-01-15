@@ -58,3 +58,45 @@ class UploadLog(db.Model):
     
     def __repr__(self):
         return f'<UploadLog {self.filename} at {self.upload_time}>'
+
+
+class StudentStats(db.Model):
+    """Persistent cache of last known LeetCode stats for each student"""
+    __tablename__ = 'student_stats'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('students.id'), unique=True, nullable=False)
+    easy_solved = db.Column(db.Integer, default=0)
+    medium_solved = db.Column(db.Integer, default=0)
+    hard_solved = db.Column(db.Integer, default=0)
+    total_solved = db.Column(db.Integer, default=0)
+    last_updated = db.Column(db.DateTime, default=datetime.utcnow)
+    is_stale = db.Column(db.Boolean, default=False)
+    
+    student = db.relationship('Student', backref=db.backref('stats', uselist=False))
+    
+    def __repr__(self):
+        return f'<StudentStats {self.student_id}: {self.total_solved} solved>'
+
+
+class WeeklyReport(db.Model):
+    """Weekly report for HoD showing student activity"""
+    __tablename__ = 'weekly_reports'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    year = db.Column(db.Integer, nullable=False)
+    section = db.Column(db.String(10), nullable=True)
+    report_date = db.Column(db.DateTime, default=datetime.utcnow)
+    week_start = db.Column(db.DateTime, nullable=False)
+    week_end = db.Column(db.DateTime, nullable=False)
+    total_students = db.Column(db.Integer, default=0)
+    inconsistent_count = db.Column(db.Integer, default=0)  # < threshold solved
+    zero_count = db.Column(db.Integer, default=0)          # 0 problems total
+    active_count = db.Column(db.Integer, default=0)        # >= threshold solved
+    data_json = db.Column(db.Text, nullable=True)          # Detailed breakdown JSON
+    email_sent = db.Column(db.Boolean, default=False)
+    email_sent_at = db.Column(db.DateTime, nullable=True)
+    
+    def __repr__(self):
+        return f'<WeeklyReport Year {self.year} - {self.report_date}>'
+

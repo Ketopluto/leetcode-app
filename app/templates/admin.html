@@ -1,16 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Panel - LeetCode Dashboard</title>
+  <link rel="icon" type="image/png" href="{{ url_for('assets', filename='favicon.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('assets', filename='favicon.png') }}">
   <style>
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
-    
+
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background-color: #f8f9fa;
@@ -74,13 +77,13 @@
     .navbar-link.logout:hover {
       background-color: #dc2626;
     }
-    
+
     .admin-container {
       max-width: 1200px;
       margin: 0 auto 40px;
       padding: 0 30px 30px;
     }
-    
+
     .header-section {
       background: #ffffff;
       padding: 30px;
@@ -88,19 +91,19 @@
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
       margin-bottom: 30px;
     }
-    
+
     .header-section h1 {
       font-size: 32px;
       color: #1a202c;
     }
-    
+
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 20px;
       margin-bottom: 30px;
     }
-    
+
     .stat-card {
       background: #ffffff;
       padding: 24px;
@@ -108,19 +111,19 @@
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
       text-align: center;
     }
-    
+
     .stat-card h3 {
       font-size: 14px;
       color: #718096;
       margin-bottom: 10px;
     }
-    
+
     .stat-card .value {
       font-size: 32px;
       font-weight: 700;
       color: #3b82f6;
     }
-    
+
     .upload-section {
       background: #ffffff;
       padding: 30px;
@@ -128,7 +131,7 @@
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
       margin-bottom: 30px;
     }
-    
+
     .upload-section h2 {
       font-size: 24px;
       margin-bottom: 20px;
@@ -201,7 +204,7 @@
     .selection-dropdown option {
       padding: 10px;
     }
-    
+
     .upload-area {
       border: 2px dashed #cbd5e0;
       border-radius: 8px;
@@ -209,16 +212,16 @@
       text-align: center;
       transition: all 0.3s ease;
     }
-    
+
     .upload-area:hover {
       border-color: #3b82f6;
       background-color: #f7fafc;
     }
-    
+
     .file-input {
       display: none;
     }
-    
+
     .upload-btn {
       display: inline-block;
       padding: 12px 28px;
@@ -229,16 +232,16 @@
       cursor: pointer;
       transition: all 0.3s ease;
     }
-    
+
     .upload-btn:hover {
       background-color: #2563eb;
     }
-    
+
     .file-info {
       margin-top: 20px;
       color: #4a5568;
     }
-    
+
     .submit-btn {
       width: 100%;
       padding: 14px;
@@ -252,34 +255,34 @@
       margin-top: 20px;
       transition: all 0.3s ease;
     }
-    
+
     .submit-btn:hover {
       background-color: #059669;
     }
-    
+
     .submit-btn:disabled {
       background-color: #cbd5e0;
       cursor: not-allowed;
     }
-    
+
     .logs-section {
       background: #ffffff;
       padding: 30px;
       border-radius: 12px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     }
-    
+
     .logs-section h2 {
       font-size: 24px;
       margin-bottom: 20px;
       color: #1a202c;
     }
-    
+
     table {
       width: 100%;
       border-collapse: collapse;
     }
-    
+
     table th {
       background-color: #f7fafc;
       padding: 12px;
@@ -288,41 +291,41 @@
       color: #4a5568;
       border-bottom: 2px solid #e2e8f0;
     }
-    
+
     table td {
       padding: 12px;
       border-bottom: 1px solid #e2e8f0;
       color: #4a5568;
     }
-    
+
     .status-success {
       color: #10b981;
       font-weight: 600;
     }
-    
+
     .status-failed {
       color: #ef4444;
       font-weight: 600;
     }
-    
+
     .alert {
       padding: 16px 20px;
       border-radius: 8px;
       margin-bottom: 20px;
     }
-    
+
     .alert-success {
       background-color: #d1fae5;
       color: #065f46;
       border: 1px solid #6ee7b7;
     }
-    
+
     .alert-error {
       background-color: #fee2e2;
       color: #991b1b;
       border: 1px solid #fecaca;
     }
-    
+
     .format-info {
       background-color: #eff6ff;
       padding: 16px;
@@ -331,12 +334,12 @@
       font-size: 14px;
       color: #1e40af;
     }
-    
+
     .format-info h4 {
       margin-bottom: 10px;
       font-size: 16px;
     }
-    
+
     .format-info ul {
       margin-left: 20px;
       margin-top: 10px;
@@ -346,11 +349,11 @@
       .navbar {
         padding: 12px 20px;
       }
-      
+
       .navbar-brand {
         font-size: 18px;
       }
-      
+
       .navbar-link {
         font-size: 12px;
         padding: 6px 12px;
@@ -366,6 +369,7 @@
     }
   </style>
 </head>
+
 <body>
   <!-- Navigation Bar -->
   <nav class="navbar">
@@ -379,23 +383,27 @@
         <span>Dashboard</span>
       </a>
       {% if session.get('hod_authenticated') %}
-        <a href="/admin" class="navbar-link">
-          <span>📤</span>
-          <span>Upload</span>
-        </a>
-        <a href="/admin/students" class="navbar-link">
-          <span>👥</span>
-          <span>Manage Students</span>
-        </a>
-        <a href="{{ url_for('admin_logout') }}" class="navbar-link logout">
-          <span>🚪</span>
-          <span>Logout</span>
-        </a>
+      <a href="/admin" class="navbar-link">
+        <span>📤</span>
+        <span>Upload</span>
+      </a>
+      <a href="/admin/students" class="navbar-link">
+        <span>👥</span>
+        <span>Manage Students</span>
+      </a>
+      <a href="/admin/reports" class="navbar-link">
+        <span>📈</span>
+        <span>Reports</span>
+      </a>
+      <a href="{{ url_for('admin_logout') }}" class="navbar-link logout">
+        <span>🚪</span>
+        <span>Logout</span>
+      </a>
       {% else %}
-        <a href="/admin/login" class="navbar-link admin">
-          <span>🔐</span>
-          <span>Admin</span>
-        </a>
+      <a href="/admin/login" class="navbar-link admin">
+        <span>🔐</span>
+        <span>Admin</span>
+      </a>
       {% endif %}
     </div>
   </nav>
@@ -404,7 +412,7 @@
     <div class="header-section">
       <h1>🎓 Admin Panel</h1>
     </div>
-    
+
     <div class="stats-grid">
       <div class="stat-card">
         <h3>Total Students</h3>
@@ -417,12 +425,12 @@
       </div>
       {% endfor %}
     </div>
-    
+
     <div class="upload-section">
       <h2>📤 Upload Student Data</h2>
-      
+
       <div id="message-container"></div>
-      
+
       <form id="uploadForm" enctype="multipart/form-data">
         <!-- Year and Section Selection -->
         <div class="selection-container">
@@ -439,7 +447,7 @@
               <option value="4">4th Year</option>
             </select>
           </div>
-          
+
           <div class="selection-group">
             <label for="sectionSelect" class="selection-label">
               <span class="label-icon">📚</span>
@@ -453,7 +461,7 @@
             </select>
           </div>
         </div>
-        
+
         <!-- File Upload Area -->
         <div class="upload-area" id="uploadArea">
           <label for="fileInput" class="upload-btn">
@@ -462,7 +470,7 @@
           <input type="file" id="fileInput" name="file" accept=".xlsx,.xls" class="file-input" required>
           <div class="file-info" id="fileInfo">No file selected</div>
         </div>
-        
+
         <div class="format-info">
           <h4>📋 Required Excel Format:</h4>
           <ul>
@@ -470,13 +478,14 @@
             <li><strong>Name</strong> (Student's full name)</li>
             <li><strong>LeetCode</strong> (Username or full profile URL)</li>
           </ul>
-          <p style="margin-top: 10px;"><strong>Note:</strong> Select the year and section above, then upload the Excel file for that specific batch.</p>
+          <p style="margin-top: 10px;"><strong>Note:</strong> Select the year and section above, then upload the Excel
+            file for that specific batch.</p>
         </div>
-        
+
         <button type="submit" id="submitBtn" class="submit-btn" disabled>Upload and Process</button>
       </form>
     </div>
-    
+
     <div class="logs-section">
       <h2>📊 Recent Uploads</h2>
       {% if logs %}
@@ -507,7 +516,7 @@
       {% endif %}
     </div>
   </div>
-  
+
   <script>
     const fileInput = document.getElementById('fileInput');
     const fileInfo = document.getElementById('fileInfo');
@@ -515,7 +524,7 @@
     const uploadForm = document.getElementById('uploadForm');
     const messageContainer = document.getElementById('message-container');
     const yearSelect = document.getElementById('yearSelect');
-    
+
     // Enable submit button only when file and year are selected
     function checkFormValidity() {
       if (fileInput.files.length > 0 && yearSelect.value !== '') {
@@ -524,10 +533,10 @@
         submitBtn.disabled = true;
       }
     }
-    
+
     yearSelect.addEventListener('change', checkFormValidity);
-    
-    fileInput.addEventListener('change', function(e) {
+
+    fileInput.addEventListener('change', function (e) {
       if (e.target.files.length > 0) {
         const file = e.target.files[0];
         fileInfo.textContent = `Selected: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
@@ -537,27 +546,27 @@
         submitBtn.disabled = true;
       }
     });
-    
-    uploadForm.addEventListener('submit', async function(e) {
+
+    uploadForm.addEventListener('submit', async function (e) {
       e.preventDefault();
-      
+
       const formData = new FormData();
       formData.append('file', fileInput.files[0]);
       formData.append('year', yearSelect.value);
       formData.append('section', document.getElementById('sectionSelect').value);
-      
+
       submitBtn.disabled = true;
       submitBtn.textContent = 'Processing...';
       messageContainer.innerHTML = '';
-      
+
       try {
         const response = await fetch('/admin/upload', {
           method: 'POST',
           body: formData
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
           messageContainer.innerHTML = `
             <div class="alert alert-success">
@@ -568,7 +577,7 @@
           fileInfo.textContent = 'No file selected';
           yearSelect.value = '';
           document.getElementById('sectionSelect').value = '';
-          
+
           setTimeout(() => {
             window.location.reload();
           }, 2000);
@@ -593,4 +602,5 @@
     });
   </script>
 </body>
+
 </html>

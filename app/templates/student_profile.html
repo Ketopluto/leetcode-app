@@ -1,16 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ student.name }} - LeetCode Profile</title>
+  <link rel="icon" type="image/png" href="{{ url_for('assets', filename='favicon.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('assets', filename='favicon.png') }}">
   <style>
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
-    
+
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background-color: #f8f9fa;
@@ -359,6 +362,7 @@
     }
   </style>
 </head>
+
 <body>
   <!-- Navigation Bar -->
   <nav class="navbar">
@@ -381,7 +385,8 @@
       <div class="profile-info">
         <div class="info-item">
           <span>🎓</span>
-          <span><strong>Year:</strong> {{ year_display }}{% if student.section %} (Section {{ student.section }}){% endif %}</span>
+          <span><strong>Year:</strong> {{ year_display }}{% if student.section %} (Section {{ student.section }}){%
+            endif %}</span>
         </div>
         <div class="info-item">
           <span>🔢</span>
@@ -398,7 +403,7 @@
         </div>
         {% endif %}
       </div>
-      
+
       {% if stats.profile_url %}
       <a href="{{ stats.profile_url }}" target="_blank" class="external-link-btn">
         <span>🔗</span>
@@ -414,19 +419,19 @@
         <div class="stat-value">{{ stats.easySolved }}</div>
         <div class="stat-label">Easy Solved</div>
       </div>
-      
+
       <div class="stat-card medium">
         <div class="stat-icon">⚡</div>
         <div class="stat-value">{{ stats.mediumSolved }}</div>
         <div class="stat-label">Medium Solved</div>
       </div>
-      
+
       <div class="stat-card hard">
         <div class="stat-icon">🔥</div>
         <div class="stat-value">{{ stats.hardSolved }}</div>
         <div class="stat-label">Hard Solved</div>
       </div>
-      
+
       <div class="stat-card total">
         <div class="stat-icon">🎯</div>
         <div class="stat-value">{{ stats.totalSolved }}</div>
@@ -441,7 +446,7 @@
         <span>📊</span>
         <span>Problem Distribution</span>
       </h2>
-      
+
       <div class="progress-section">
         <div class="progress-item">
           <div class="progress-label">
@@ -452,7 +457,7 @@
             <div class="progress-bar easy" style="width: {{ (stats.easySolved / 800 * 100) | round }}%"></div>
           </div>
         </div>
-        
+
         <div class="progress-item">
           <div class="progress-label">
             <span>Medium Problems</span>
@@ -462,7 +467,7 @@
             <div class="progress-bar medium" style="width: {{ (stats.mediumSolved / 1700 * 100) | round }}%"></div>
           </div>
         </div>
-        
+
         <div class="progress-item">
           <div class="progress-label">
             <span>Hard Problems</span>
@@ -482,7 +487,7 @@
         <span>📝</span>
         <span>Recent Submissions</span>
       </h2>
-      
+
       {% if stats.recentSubmissions %}
       <div class="submissions-list">
         {% for submission in stats.recentSubmissions %}
@@ -512,7 +517,7 @@
         <span>⭐</span>
         <span>Community Engagement</span>
       </h2>
-      
+
       <div class="stats-grid">
         {% if stats.contributionPoint > 0 %}
         <div class="stat-card">
@@ -521,7 +526,7 @@
           <div class="stat-label">Contribution Points</div>
         </div>
         {% endif %}
-        
+
         {% if stats.reputation > 0 %}
         <div class="stat-card">
           <div class="stat-icon">⭐</div>
@@ -534,4 +539,5 @@
     {% endif %}
   </div>
 </body>
+
 </html>

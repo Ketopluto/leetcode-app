@@ -1,16 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Edit Student - Admin Panel</title>
+  <link rel="icon" type="image/png" href="{{ url_for('assets', filename='favicon.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('assets', filename='favicon.png') }}">
   <style>
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
-    
+
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background-color: #f8f9fa;
@@ -175,6 +178,7 @@
     }
   </style>
 </head>
+
 <body>
   <nav class="navbar">
     <a href="/" class="navbar-brand">
@@ -195,13 +199,13 @@
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert alert-{{ category }}">
-            {{ message }}
-          </div>
-        {% endfor %}
-      {% endif %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }}">
+      {{ message }}
+    </div>
+    {% endfor %}
+    {% endif %}
     {% endwith %}
 
     <div class="form-card">
@@ -213,25 +217,24 @@
 
         <div class="form-group">
           <label for="register_number">Register Number *</label>
-          <input type="text" id="register_number" name="register_number" 
-                 value="{{ student.register_number }}" required>
+          <input type="text" id="register_number" name="register_number" value="{{ student.register_number }}" required>
           <p class="form-hint">Example: 310623148001</p>
         </div>
 
         <div class="form-group">
           <label for="leetcode_username">LeetCode Username or Profile URL *</label>
-          <input type="text" id="leetcode_username" name="leetcode_username" 
-                 value="{{ student.leetcode_username }}" required>
+          <input type="text" id="leetcode_username" name="leetcode_username" value="{{ student.leetcode_username }}"
+            required>
           <p class="form-hint">You can enter just the username or full profile URL</p>
         </div>
 
         <div class="form-group">
           <label for="year">Year *</label>
           <select id="year" name="year" required>
-            <option value="1" {% if student.year == 1 %}selected{% endif %}>1st Year</option>
-            <option value="2" {% if student.year == 2 %}selected{% endif %}>2nd Year</option>
-            <option value="3" {% if student.year == 3 %}selected{% endif %}>3rd Year</option>
-            <option value="4" {% if student.year == 4 %}selected{% endif %}>4th Year</option>
+            <option value="1" {% if student.year==1 %}selected{% endif %}>1st Year</option>
+            <option value="2" {% if student.year==2 %}selected{% endif %}>2nd Year</option>
+            <option value="3" {% if student.year==3 %}selected{% endif %}>3rd Year</option>
+            <option value="4" {% if student.year==4 %}selected{% endif %}>4th Year</option>
           </select>
         </div>
 
@@ -239,9 +242,9 @@
           <label for="section">Section (Optional)</label>
           <select id="section" name="section">
             <option value="">No Section</option>
-            <option value="A" {% if student.section == 'A' %}selected{% endif %}>Section A</option>
-            <option value="B" {% if student.section == 'B' %}selected{% endif %}>Section B</option>
-            <option value="C" {% if student.section == 'C' %}selected{% endif %}>Section C</option>
+            <option value="A" {% if student.section=='A' %}selected{% endif %}>Section A</option>
+            <option value="B" {% if student.section=='B' %}selected{% endif %}>Section B</option>
+            <option value="C" {% if student.section=='C' %}selected{% endif %}>Section C</option>
           </select>
         </div>
 
@@ -253,4 +256,5 @@
     </div>
   </div>
 </body>
+
 </html>

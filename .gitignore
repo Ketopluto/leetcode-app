@@ -33,6 +33,7 @@ uploads/
 Thumbs.db
 
 # Logs
+logs/
 *.log
 
 # Batch files

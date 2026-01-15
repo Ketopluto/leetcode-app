@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Details - {{ year_str }}</title>
+    <link rel="icon" type="image/png" href="{{ url_for('assets', filename='favicon.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('assets', filename='favicon.png') }}">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f8f9fa;
+            color: #2d3748;
+        }
+
+        .navbar {
+            background-color: #ffffff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .navbar-brand {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a202c;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .navbar-links {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .navbar-link {
+            color: #4a5568;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .navbar-link:hover {
+            background-color: #f7fafc;
+            color: #3b82f6;
+        }
+
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto 40px;
+            padding: 0 30px 30px;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .header-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            margin-bottom: 30px;
+            color: white;
+        }
+
+        .header-section h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .header-section p {
+            opacity: 0.9;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: #ffffff;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #718096;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .value {
+            font-size: 36px;
+            font-weight: 700;
+        }
+
+        .stat-card .value.zero {
+            color: #dc3545;
+        }
+
+        .stat-card .value.inconsistent {
+            color: #fd7e14;
+        }
+
+        .stat-card .value.active {
+            color: #28a745;
+        }
+
+        .stat-card .value.total {
+            color: #3b82f6;
+        }
+
+        .section {
+            background: #ffffff;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+
+        .section h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section h2.zero {
+            color: #dc3545;
+        }
+
+        .section h2.inconsistent {
+            color: #fd7e14;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        table th {
+            background-color: #f7fafc;
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+            color: #4a5568;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        table td {
+            padding: 10px;
+            border-bottom: 1px solid #e2e8f0;
+            color: #4a5568;
+            font-size: 14px;
+        }
+
+        .email-preview {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            background: #fafafa;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+
+        .actions-bar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .empty-message {
+            color: #718096;
+            font-style: italic;
+            padding: 20px;
+            text-align: center;
+        }
+
+        #message-container .alert {
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background-color: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+
+        .alert-error {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">
+            <span>📊</span>
+            <span>LeetCode Stats</span>
+        </a>
+        <div class="navbar-links">
+            <a href="/" class="navbar-link">🏠 Dashboard</a>
+            <a href="/admin" class="navbar-link">📤 Upload</a>
+            <a href="/admin/reports" class="navbar-link">📈 Reports</a>
+        </div>
+    </nav>
+
+    <div class="admin-container">
+        <a href="/admin/reports" class="back-link">← Back to Reports</a>
+
+        <div class="header-section">
+            <h1>📊 {{ year_str }}</h1>
+            <p>Week: {{ report.week_start.strftime('%B %d') }} - {{ report.week_end.strftime('%B %d, %Y') }}</p>
+        </div>
+
+        <div id="message-container"></div>
+
+        <div class="actions-bar">
+            {% if report.email_sent %}
+            <span class="badge badge-success" style="padding: 10px 15px;">✓ Email Sent {{
+                report.email_sent_at.strftime('%b %d at %I:%M %p') if report.email_sent_at else '' }}</span>
+            {% else %}
+            <button class="btn btn-primary" id="sendEmailBtn" onclick="sendEmail()">
+                📧 Send Email to HoD
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Students</h3>
+                <div class="value total">{{ report.total_students }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Zero Solvers</h3>
+                <div class="value zero">{{ report.zero_count }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Inconsistent (&lt; {{ data.threshold }})</h3>
+                <div class="value inconsistent">{{ report.inconsistent_count }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Active Solvers</h3>
+                <div class="value active">{{ report.active_count }}</div>
+            </div>
+        </div>
+
+        {% if data.zero_solvers %}
+        <div class="section">
+            <h2 class="zero">🔴 Zero Solvers ({{ data.zero_solvers | length }})</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Register No</th>
+                        <th>Name</th>
+                        <th>LeetCode Username</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in data.zero_solvers %}
+                    <tr>
+                        <td>{{ s.register_number }}</td>
+                        <td>{{ s.name }}</td>
+                        <td><a href="https://leetcode.com/u/{{ s.leetcode_username }}" target="_blank">{{
+                                s.leetcode_username }}</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if data.inconsistent_solvers %}
+        <div class="section">
+            <h2 class="inconsistent">🟠 Inconsistent Solvers ({{ data.inconsistent_solvers | length }})</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Register No</th>
+                        <th>Name</th>
+                        <th>LeetCode</th>
+                        <th>Easy</th>
+                        <th>Medium</th>
+                        <th>Hard</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in data.inconsistent_solvers %}
+                    <tr>
+                        <td>{{ s.register_number }}</td>
+                        <td>{{ s.name }}</td>
+                        <td><a href="https://leetcode.com/u/{{ s.leetcode_username }}" target="_blank">{{
+                                s.leetcode_username }}</a></td>
+                        <td>{{ s.easy }}</td>
+                        <td>{{ s.medium }}</td>
+                        <td>{{ s.hard }}</td>
+                        <td><strong>{{ s.total_solved }}</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <div class="section">
+            <h2>📧 Email Preview</h2>
+            <div class="email-preview">
+                {{ html_preview | safe }}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function sendEmail() {
+            const btn = document.getElementById('sendEmailBtn');
+            const container = document.getElementById('message-container');
+
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Sending...';
+            container.innerHTML = '';
+
+            try {
+                const response = await fetch('/admin/reports/{{ report.id }}/send-email', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.success) {
+                    container.innerHTML = `<div class="alert alert-success">✅ ${data.message}</div>`;
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    container.innerHTML = `<div class="alert alert-error">❌ ${data.message}</div>`;
+                    btn.disabled = false;
+                    btn.innerHTML = '📧 Send Email to HoD';
+                }
+            } catch (error) {
+                container.innerHTML = `<div class="alert alert-error">❌ Error: ${error.message}</div>`;
+                btn.disabled = false;
+                btn.innerHTML = '📧 Send Email to HoD';
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -1,16 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Manage Students - Admin Panel</title>
+  <link rel="icon" type="image/png" href="{{ url_for('assets', filename='favicon.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('assets', filename='favicon.png') }}">
   <style>
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
-    
+
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background-color: #f8f9fa;
@@ -325,7 +328,7 @@
       .filters form {
         grid-template-columns: 1fr;
       }
-      
+
       .header {
         flex-direction: column;
         align-items: flex-start;
@@ -334,6 +337,7 @@
     }
   </style>
 </head>
+
 <body>
   <nav class="navbar">
     <a href="/" class="navbar-brand">
@@ -368,43 +372,43 @@
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert alert-{{ category }}">
-            {{ message }}
-          </div>
-        {% endfor %}
-      {% endif %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }}">
+      {{ message }}
+    </div>
+    {% endfor %}
+    {% endif %}
     {% endwith %}
 
     <div class="filters">
       <form method="GET" action="{{ url_for('admin_students') }}">
         <div class="filter-group">
           <label for="search">🔍 Search</label>
-          <input type="text" id="search" name="search" value="{{ search }}" 
-                 placeholder="Search by name, register no, or username" class="filter-input">
+          <input type="text" id="search" name="search" value="{{ search }}"
+            placeholder="Search by name, register no, or username" class="filter-input">
         </div>
-        
+
         <div class="filter-group">
           <label for="year">Year</label>
           <select id="year" name="year" class="filter-input">
             <option value="">All Years</option>
             {% for y in years %}
-            <option value="{{ y }}" {% if year_filter == y|string %}selected{% endif %}>Year {{ y }}</option>
+            <option value="{{ y }}" {% if year_filter==y|string %}selected{% endif %}>Year {{ y }}</option>
             {% endfor %}
           </select>
         </div>
-        
+
         <div class="filter-group">
           <label for="section">Section</label>
           <select id="section" name="section" class="filter-input">
             <option value="">All Sections</option>
             {% for s in sections %}
-            <option value="{{ s }}" {% if section_filter == s %}selected{% endif %}>Section {{ s }}</option>
+            <option value="{{ s }}" {% if section_filter==s %}selected{% endif %}>Section {{ s }}</option>
             {% endfor %}
           </select>
         </div>
-        
+
         <button type="submit" class="filter-btn">Apply</button>
       </form>
     </div>
@@ -438,7 +442,8 @@
               {% endif %}
             </td>
             <td style="font-size: 13px; color: #718096;">
-              {{ student.updated_at.strftime('%Y-%m-%d %H:%M') if student.updated_at else student.created_at.strftime('%Y-%m-%d %H:%M') }}
+              {{ student.updated_at.strftime('%Y-%m-%d %H:%M') if student.updated_at else
+              student.created_at.strftime('%Y-%m-%d %H:%M') }}
             </td>
             <td>
               <div class="actions">
@@ -469,33 +474,33 @@
     {% if pagination.pages > 1 %}
     <div class="pagination">
       <span class="pagination-info">
-        Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }} - 
+        Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }} -
         {{ min(pagination.page * pagination.per_page, pagination.total) }} of {{ pagination.total }}
       </span>
-      
+
       {% if pagination.has_prev %}
-      <a href="{{ url_for('admin_students', page=pagination.prev_num, search=search, year=year_filter, section=section_filter) }}" 
-         class="pagination-btn">← Previous</a>
+      <a href="{{ url_for('admin_students', page=pagination.prev_num, search=search, year=year_filter, section=section_filter) }}"
+        class="pagination-btn">← Previous</a>
       {% else %}
       <span class="pagination-btn disabled">← Previous</span>
       {% endif %}
 
       {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
-        {% if page_num %}
-          {% if page_num == pagination.page %}
-          <span class="pagination-btn active">{{ page_num }}</span>
-          {% else %}
-          <a href="{{ url_for('admin_students', page=page_num, search=search, year=year_filter, section=section_filter) }}" 
-             class="pagination-btn">{{ page_num }}</a>
-          {% endif %}
-        {% else %}
-          <span class="pagination-btn disabled">...</span>
-        {% endif %}
+      {% if page_num %}
+      {% if page_num == pagination.page %}
+      <span class="pagination-btn active">{{ page_num }}</span>
+      {% else %}
+      <a href="{{ url_for('admin_students', page=page_num, search=search, year=year_filter, section=section_filter) }}"
+        class="pagination-btn">{{ page_num }}</a>
+      {% endif %}
+      {% else %}
+      <span class="pagination-btn disabled">...</span>
+      {% endif %}
       {% endfor %}
 
       {% if pagination.has_next %}
-      <a href="{{ url_for('admin_students', page=pagination.next_num, search=search, year=year_filter, section=section_filter) }}" 
-         class="pagination-btn">Next →</a>
+      <a href="{{ url_for('admin_students', page=pagination.next_num, search=search, year=year_filter, section=section_filter) }}"
+        class="pagination-btn">Next →</a>
       {% else %}
       <span class="pagination-btn disabled">Next →</span>
       {% endif %}
@@ -531,4 +536,5 @@
     }
   </script>
 </body>
+
 </html>

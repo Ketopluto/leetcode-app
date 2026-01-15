@@ -11,15 +11,21 @@ from werkzeug.utils import secure_filename
 import pandas as pd
 
 from app import app, cache, db
-from app.models import Student, UploadLog
+from app.models import Student, UploadLog, StudentStats, WeeklyReport
+from app.logger import log_info, log_error, log_debug, log_exception
+from app.leetcode_api import (
+    fetch_students_concurrent,
+    get_circuit_breaker_status,
+    CACHE_TTL,
+    CONCURRENCY,
+    TIMEOUT_SECONDS
+)
 
 # -----------------------
-# Configurable tunables
+# Configurable tunables (now in leetcode_api.py, kept here for backward compat)
 # -----------------------
-CACHE_TTL = 120            # seconds each student's stats are cached
-CONCURRENCY = 50           # number of concurrent requests to LeetCode API (tune if you see errors)
-TIMEOUT_SECONDS = 5        # aiohttp total timeout for each request
-FETCH_ATTEMPTS = 2         # retry attempts per username
+# CACHE_TTL, CONCURRENCY, TIMEOUT_SECONDS imported from leetcode_api
+FETCH_ATTEMPTS = 3  # retry attempts per API source
 # -----------------------
 
 def allowed_file(filename):
@@ -43,7 +49,7 @@ def get_available_year_sections():
         else:
             options.append(year_str)
 
-    print(f"Available year-section options: {options}")
+    log_debug(f"Available year-section options: {options}", tag="DB")
     return options
 
 
@@ -54,140 +60,40 @@ def load_students_from_db():
             for s in students]
 
 
-# -----------------------
-# Optimized concurrent fetcher
-# -----------------------
-
-async def _fetch_student_with_session(username, name, roll_no, year, section, session, attempts=FETCH_ATTEMPTS):
-    """Internal: fetch one student's stats using provided aiohttp session."""
-    uname = (username or "").strip()
-    if not uname or uname.lower() == "higher studies":
-        # Placeholder username - not an error, just skip
-        stats = {"easy": 0, "medium": 0, "hard": 0, "total": 0, "user_error": None, "temp_error": None}
-    else:
-        url = f"https://alfa-leetcode-api-blush.vercel.app/{uname}/solved"
-        stats = {"easy": 0, "medium": 0, "hard": 0, "total": 0, "user_error": None, "temp_error": None}
-        for attempt in range(attempts):
-            try:
-                async with session.get(url) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        # Check if the API returned an error (user doesn't exist)
-                        # The LeetCode API returns HTTP 200 even for errors, but includes an "errors" array
-                        if "errors" in data:
-                            # User doesn't exist on LeetCode - this IS a user error
-                            error_msg = "user_not_found"
-                            if len(data["errors"]) > 0:
-                                error_msg = data["errors"][0].get("message", "user_not_found")
-                            stats = {
-                                "easy": 0, "medium": 0, "hard": 0, "total": 0,
-                                "user_error": error_msg,  # Shows warning icon
-                                "temp_error": None
-                            }
-                            print(f"[LeetCode API] User '{uname}' not found: {error_msg}")
-                            break
-                        else:
-                            # Valid user data - success!
-                            stats = {
-                                "easy": data.get("easySolved", 0),
-                                "medium": data.get("mediumSolved", 0),
-                                "hard": data.get("hardSolved", 0),
-                                "total": data.get("solvedProblem", 0),
-                                "user_error": None,
-                                "temp_error": None
-                            }
-                            break
-                    else:
-                        # non-200: this is a temporary server issue, not a user error
-                        if 500 <= resp.status < 600:
-                            # server error: let it retry
-                            stats["temp_error"] = f"server_error_{resp.status}"
-                        else:
-                            stats["temp_error"] = f"http_error_{resp.status}"
-                            break
-            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-                if attempt + 1 < attempts:
-                    await asyncio.sleep(0.15 * (attempt + 1))
-                else:
-                    # final attempt failed - this is a TEMPORARY error, not a user error
-                    stats["temp_error"] = f"network_error: {str(e)}"
-
-    year_suffix = 'st' if year == 1 else 'nd' if year == 2 else 'rd' if year == 3 else 'th'
-    year_str = f"{year}{year_suffix} Year"
-    year_display = f"{year_str} ({section})" if section else year_str
-
-    return {
-        "roll_no": roll_no,
-        "actual_name": name,
-        "username": username,
-        "year": year_str,
-        "year_display": year_display,
-        "year_number": year,
-        "section": section,
-        "easy": stats["easy"],
-        "medium": stats["medium"],
-        "hard": stats["hard"],
-        "total": stats["total"],
-        "fetch_error": stats.get("user_error"),  # Only user errors show warning icon
-        "fetched_at": int(time.time())
-    }
-
-
-async def fetch_students_concurrent(students_to_fetch, concurrency=CONCURRENCY, timeout_seconds=TIMEOUT_SECONDS):
-    """
-    Fetch a list of students ([(username,name,roll,year,section), ...]) concurrently
-    using a semaphore and a single aiohttp session.
-    """
-    if not students_to_fetch:
-        return []
-
-    # limit_per_host + limit tuned to overall concurrency
-    connector = aiohttp.TCPConnector(limit_per_host=concurrency, limit=concurrency)
-    timeout = aiohttp.ClientTimeout(total=timeout_seconds)
-
-    sem = asyncio.Semaphore(concurrency)
-
-    async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
-        async def guarded_fetch(item):
-            async with sem:
-                username, name, roll, year, section = item
-                try:
-                    return await _fetch_student_with_session(username, name, roll, year, section, session)
-                except Exception as e:
-                    # return a default dict on error - this is a TEMPORARY error, not a user error
-                    print(f"[LeetCode API] Exception fetching '{username}': {e}")
-                    return {
-                        "roll_no": roll,
-                        "actual_name": name,
-                        "username": username,
-                        "year": f"{year}",
-                        "year_display": f"{year}",
-                        "year_number": year,
-                        "section": section,
-                        "easy": 0,
-                        "medium": 0,
-                        "hard": 0,
-                        "total": 0,
-                        "fetch_error": None,  # Don't show warning for temp errors
-                        "fetched_at": int(time.time())
-                    }
-
-        tasks = [asyncio.create_task(guarded_fetch(s)) for s in students_to_fetch]
-        results = await asyncio.gather(*tasks, return_exceptions=False)
-        return results
+# NOTE: fetch_students_concurrent is now imported from leetcode_api.py
+# which has fallback APIs, circuit breaker, and exponential backoff
 
 
 def get_all_stats(cache_ttl=CACHE_TTL, concurrency=CONCURRENCY, timeout_seconds=TIMEOUT_SECONDS):
     """
     Synchronous wrapper used by Flask routes. It:
     1) loads students from DB,
-    2) returns cached stats for students that have them,
-    3) concurrently fetches only the missing ones,
-    4) stores fetched results in cache and returns combined list.
+    2) returns cached stats for students that have them (memory cache),
+    3) concurrently fetches only the missing ones using robust API module,
+    4) stores fetched results in memory cache AND database (for fallback),
+    5) returns combined list.
     """
     students = load_students_from_db()  # returns tuples (username, name, roll, year, section)
     cached_results = []
     to_fetch = []
+
+    # Also load student IDs for database operations
+    student_id_map = {}  # username.lower() -> student_id
+    for student in Student.query.all():
+        if student.leetcode_username:
+            student_id_map[student.leetcode_username.strip().lower()] = student.id
+
+    # Load cached stats from database for fallback
+    db_stats_map = {}  # username.lower() -> {easy_solved, medium_solved, hard_solved, total_solved}
+    for stats in StudentStats.query.all():
+        if stats.student:
+            uname = (stats.student.leetcode_username or "").strip().lower()
+            db_stats_map[uname] = {
+                "easy_solved": stats.easy_solved,
+                "medium_solved": stats.medium_solved,
+                "hard_solved": stats.hard_solved,
+                "total_solved": stats.total_solved
+            }
 
     # collect cached ones and decide which to fetch
     for username, name, roll, year, section in students:
@@ -202,24 +108,76 @@ def get_all_stats(cache_ttl=CACHE_TTL, concurrency=CONCURRENCY, timeout_seconds=
         else:
             to_fetch.append((username, name, roll, year, section))
 
-    # fetch missing ones concurrently
+    # fetch missing ones concurrently using robust API module
     if to_fetch:
         try:
-            fetched = asyncio.run(fetch_students_concurrent(to_fetch, concurrency=concurrency, timeout_seconds=timeout_seconds))
+            fetched = asyncio.run(fetch_students_concurrent(
+                to_fetch,
+                cached_stats_map=db_stats_map,
+                concurrency=concurrency
+            ))
         except Exception as e:
-            # on a catastrophic failure, fallback to returning cached results only
-            print("Error during concurrent fetch:", e)
+            # on a catastrophic failure, fallback to DB cached results
+            log_error(f"Error during concurrent fetch: {e}", tag="API")
             fetched = []
+            # Build fallback results from database
+            for username, name, roll, year, section in to_fetch:
+                uname = (username or "").strip().lower()
+                db_cached = db_stats_map.get(uname, {})
+                year_suffix = 'st' if year == 1 else 'nd' if year == 2 else 'rd' if year == 3 else 'th'
+                year_str = f"{year}{year_suffix} Year"
+                year_display = f"{year_str} ({section})" if section else year_str
+                fetched.append({
+                    "roll_no": roll,
+                    "actual_name": name,
+                    "username": username,
+                    "year": year_str,
+                    "year_display": year_display,
+                    "year_number": year,
+                    "section": section,
+                    "easy": db_cached.get("easy_solved", 0),
+                    "medium": db_cached.get("medium_solved", 0),
+                    "hard": db_cached.get("hard_solved", 0),
+                    "total": db_cached.get("total_solved", 0),
+                    "fetch_error": None,
+                    "is_stale": True,
+                    "fetched_at": int(time.time())
+                })
 
-        # save to cache
+        # save to memory cache AND database
         for item in fetched:
             try:
                 uname = (item.get("username") or "").strip().lower()
+                
+                # Save to memory cache
                 cache_key = f"stats:{uname}"
-                # cache.set(key, value, timeout) — Flask-Caching signature
                 cache.set(cache_key, item, timeout=cache_ttl)
-            except Exception:
-                pass
+                
+                # Save to database (for fallback on future failures)
+                if not item.get("is_stale") and item.get("total", 0) > 0 or not item.get("fetch_error"):
+                    student_id = student_id_map.get(uname)
+                    if student_id:
+                        stats = StudentStats.query.filter_by(student_id=student_id).first()
+                        if not stats:
+                            stats = StudentStats(student_id=student_id)
+                            db.session.add(stats)
+                        
+                        stats.easy_solved = item.get("easy", 0)
+                        stats.medium_solved = item.get("medium", 0)
+                        stats.hard_solved = item.get("hard", 0)
+                        stats.total_solved = item.get("total", 0)
+                        stats.last_updated = datetime.utcnow()
+                        stats.is_stale = False
+                        
+            except Exception as e:
+                log_error(f"Error saving stats for {uname}: {e}", tag="DB")
+        
+        # Commit database changes
+        try:
+            db.session.commit()
+        except Exception as e:
+            log_error(f"Error committing stats to database: {e}", tag="DB")
+            db.session.rollback()
 
         results = cached_results + fetched
     else:
@@ -240,9 +198,10 @@ def get_all_stats(cache_ttl=CACHE_TTL, concurrency=CONCURRENCY, timeout_seconds=
 def refresh_all_stats_in_background(cache_ttl=CACHE_TTL, concurrency=CONCURRENCY, timeout_seconds=TIMEOUT_SECONDS):
     def _refresh():
         try:
-            _ = get_all_stats(cache_ttl=cache_ttl, concurrency=concurrency, timeout_seconds=timeout_seconds)
+            with app.app_context():
+                _ = get_all_stats(cache_ttl=cache_ttl, concurrency=concurrency, timeout_seconds=timeout_seconds)
         except Exception as e:
-            print("Background refresh failed:", e)
+            log_error(f"Background refresh failed: {e}", tag="Cache")
     t = threading.Thread(target=_refresh, daemon=True)
     t.start()
 
@@ -318,7 +277,7 @@ async def _fetch_detailed_with_session(username, session, timeout_seconds=10):
                 "profile_url": f"https://leetcode.com/u/{username}/"
             }
     except Exception as e:
-        print(f"Error fetching detailed stats for {username}: {e}")
+        log_error(f"Error fetching detailed stats for {username}: {e}", tag="API")
     return None
 
 
@@ -342,7 +301,7 @@ def fetch_detailed_leetcode_stats(username):
         # run short async helper
         return asyncio.run(_fetch_detailed_with_session(username, None))
     except Exception as e:
-        print("fetch_detailed_leetcode_stats error:", e)
+        log_error(f"fetch_detailed_leetcode_stats error: {e}", tag="API")
         return {
             "username": username,
             "totalSolved": 0,
@@ -499,7 +458,7 @@ def upload_excel():
 
         df.columns = cleaned_columns
 
-        print(f"Detected columns: {list(df.columns)}")
+        log_debug(f"Detected columns: {list(df.columns)}", tag="Upload")
 
         column_mapping = {}
 
@@ -515,7 +474,7 @@ def upload_excel():
             elif ('leetcode' in col_str or 'profile' in col_str or 'username' in col_str or 'url' in col_str) and 'leetcode' not in column_mapping:
                 column_mapping['leetcode'] = col
 
-        print(f"Column mapping: {column_mapping}")
+        log_debug(f"Column mapping: {column_mapping}", tag="Upload")
 
         if len(column_mapping) < 3:
             return jsonify({
@@ -606,10 +565,7 @@ def upload_excel():
     except Exception as e:
         db.session.rollback()
         import traceback
-        print("=" * 50)
-        print("ERROR in upload_excel:")
-        print(traceback.format_exc())
-        print("=" * 50)
+        log_exception(f"ERROR in upload_excel: {e}", tag="Upload")
         return jsonify({'success': False, 'message': f'Error processing file: {str(e)}'}), 500
 
 
@@ -796,14 +752,14 @@ def download_csv():
 def api_stats():
     selected_filter = request.args.get("year", None)
 
-    print(f"API called with filter: '{selected_filter}'")
+    log_debug(f"API called with filter: '{selected_filter}'", tag="API")
 
     # Use fast cached/concurrent fetcher
     all_results = get_all_stats()
 
     if selected_filter:
         results = [r for r in all_results if r["year_display"] == selected_filter]
-        print(f"Filtered results: {len(results)} out of {len(all_results)}")
+        log_debug(f"Filtered results: {len(results)} out of {len(all_results)}", tag="API")
     else:
         results = all_results
 
@@ -811,3 +767,183 @@ def api_stats():
     refresh_all_stats_in_background()
 
     return {"results": results, "available_years": get_available_year_sections()}
+
+
+# -----------------------
+# Weekly Reports Admin Routes
+# -----------------------
+
+@app.route("/admin/reports")
+def admin_reports():
+    """View weekly reports dashboard"""
+    if not session.get('hod_authenticated'):
+        return redirect(url_for('admin_login'))
+    
+    from app.reports import get_report_summary
+    from app.email_service import get_email_status
+    from app.scheduler import get_scheduler_status
+    
+    # Get all reports grouped by year, ordered by date
+    reports = WeeklyReport.query.order_by(WeeklyReport.report_date.desc()).limit(50).all()
+    report_summaries = [get_report_summary(r) for r in reports]
+    
+    return render_template(
+        "admin_reports.html",
+        reports=report_summaries,
+        email_status=get_email_status(),
+        scheduler_status=get_scheduler_status()
+    )
+
+
+@app.route("/admin/reports/<int:report_id>")
+def admin_report_detail(report_id):
+    """View a specific report's details"""
+    if not session.get('hod_authenticated'):
+        return redirect(url_for('admin_login'))
+    
+    import json
+    from app.reports import get_report_email_html
+    
+    report = WeeklyReport.query.get_or_404(report_id)
+    data = json.loads(report.data_json) if report.data_json else {}
+    
+    year_suffix = 'st' if report.year == 1 else 'nd' if report.year == 2 else 'rd' if report.year == 3 else 'th'
+    year_str = f"{report.year}{year_suffix} Year"
+    if report.section:
+        year_str += f" ({report.section})"
+    
+    return render_template(
+        "admin_report_detail.html",
+        report=report,
+        data=data,
+        year_str=year_str,
+        html_preview=get_report_email_html(report)
+    )
+
+
+@app.route("/admin/reports/generate", methods=['POST'])
+def admin_generate_reports():
+    """Manually generate weekly reports"""
+    if not session.get('hod_authenticated'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 403
+    
+    from app.reports import generate_all_weekly_reports, get_report_email_html
+    from app.email_service import send_report_email, is_email_configured
+    
+    try:
+        reports = generate_all_weekly_reports()
+        
+        email_results = []
+        if is_email_configured():
+            for report in reports:
+                html_content = get_report_email_html(report)
+                success, message = send_report_email(report, html_content)
+                email_results.append({
+                    'year': report.year,
+                    'section': report.section,
+                    'email_sent': success,
+                    'message': message
+                })
+        
+        return jsonify({
+            'success': True,
+            'message': f'Generated {len(reports)} reports',
+            'reports_count': len(reports),
+            'email_results': email_results
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route("/admin/reports/<int:report_id>/send-email", methods=['POST'])
+def admin_send_report_email(report_id):
+    """Manually send email for a specific report"""
+    if not session.get('hod_authenticated'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 403
+    
+    from app.reports import get_report_email_html
+    from app.email_service import send_report_email
+    
+    report = WeeklyReport.query.get_or_404(report_id)
+    html_content = get_report_email_html(report)
+    success, message = send_report_email(report, html_content)
+    
+    return jsonify({
+        'success': success,
+        'message': message
+    })
+
+
+@app.route("/api/circuit-breaker-status")
+def api_circuit_breaker_status():
+    """Get current circuit breaker status for monitoring"""
+    return jsonify(get_circuit_breaker_status())
+
+
+# -----------------------
+# External Cron API Endpoints (for Vercel serverless deployment)
+# Use cron-job.org or similar to trigger these on schedule
+# -----------------------
+
+@app.route("/api/cron/weekly-reports", methods=['POST', 'GET'])
+def api_cron_weekly_reports():
+    """
+    External cron endpoint to trigger weekly report generation.
+    For Vercel serverless where APScheduler doesn't work.
+    
+    Security: Set CRON_SECRET env var and pass it as ?secret=xxx
+    
+    Usage with cron-job.org:
+    - URL: https://your-app.vercel.app/api/cron/weekly-reports?secret=YOUR_SECRET
+    - Method: GET or POST
+    - Schedule: Every Monday at 8:00 AM
+    """
+    import os
+    
+    # Simple secret-based auth for cron jobs
+    cron_secret = os.environ.get('CRON_SECRET', '')
+    provided_secret = request.args.get('secret', '')
+    
+    # Skip auth if no secret is configured (development mode)
+    if cron_secret and provided_secret != cron_secret:
+        return jsonify({
+            'success': False,
+            'message': 'Unauthorized - invalid or missing secret'
+        }), 401
+    
+    from app.reports import generate_all_weekly_reports, get_report_email_html
+    from app.email_service import send_report_email, is_email_configured
+    
+    try:
+        reports = generate_all_weekly_reports()
+        
+        email_results = []
+        if is_email_configured():
+            for report in reports:
+                html_content = get_report_email_html(report)
+                success, message = send_report_email(report, html_content)
+                email_results.append({
+                    'year': report.year,
+                    'section': report.section,
+                    'email_sent': success,
+                    'message': message
+                })
+        
+        return jsonify({
+            'success': True,
+            'message': f'Generated {len(reports)} reports',
+            'reports_count': len(reports),
+            'email_results': email_results,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        import traceback
+        print(f"[Cron] Error generating weekly reports: {traceback.format_exc()}")
+        return jsonify({
+            'success': False, 
+            'message': str(e)
+        }), 500
+
+
