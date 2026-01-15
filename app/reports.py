@@ -34,6 +34,13 @@ def get_week_boundaries(for_date: datetime = None) -> tuple:
 def generate_report_for_year(year: int, section: str = None) -> WeeklyReport:
     """
     Generate a weekly report for a specific year (and optionally section).
+    
+    Categories:
+    - Zero Solvers: Students with 0 problems solved
+    - Inconsistent: Students with < 5 problems solved (all-time)
+    - Active: Students with >= 5 problems solved
+    
+    Note: "higher studies" students are excluded from reports.
     """
     week_start, week_end = get_week_boundaries()
     
@@ -51,8 +58,15 @@ def generate_report_for_year(year: int, section: str = None) -> WeeklyReport:
     zero_solvers = []
     inconsistent_solvers = []
     active_solvers = []
+    excluded_count = 0  # higher studies
     
     for student in students:
+        # Skip "higher studies" students
+        username = (student.leetcode_username or "").strip().lower()
+        if username == "higher studies":
+            excluded_count += 1
+            continue
+        
         stats = StudentStats.query.filter_by(student_id=student.id).first()
         
         total = stats.total_solved if stats else 0
@@ -94,7 +108,7 @@ def generate_report_for_year(year: int, section: str = None) -> WeeklyReport:
         report_date=datetime.utcnow(),
         week_start=week_start,
         week_end=week_end,
-        total_students=len(students),
+        total_students=len(students) - excluded_count,  # Exclude "higher studies"
         zero_count=len(zero_solvers),
         inconsistent_count=len(inconsistent_solvers),
         active_count=len(active_solvers),
