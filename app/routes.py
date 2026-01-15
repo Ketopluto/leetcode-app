@@ -750,23 +750,82 @@ def download_csv():
 
 @app.route("/api/stats")
 def api_stats():
+    """
+    Fast API endpoint that returns cached database stats immediately.
+    On Vercel, we can't wait for live LeetCode API calls (10s timeout).
+    Background refresh happens separately.
+    """
     selected_filter = request.args.get("year", None)
+    IS_VERCEL = os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV')
 
-    log_debug(f"API called with filter: '{selected_filter}'", tag="API")
+    log_debug(f"API called with filter: '{selected_filter}', Vercel: {bool(IS_VERCEL)}", tag="API")
 
-    # Use fast cached/concurrent fetcher
-    all_results = get_all_stats()
-
-    if selected_filter:
-        results = [r for r in all_results if r["year_display"] == selected_filter]
-        log_debug(f"Filtered results: {len(results)} out of {len(all_results)}", tag="API")
+    if IS_VERCEL:
+        # FAST PATH for Vercel: Return DB cached data immediately
+        results = get_stats_from_db(selected_filter)
     else:
-        results = all_results
+        # Local: Use the full fetcher with live data
+        all_results = get_all_stats()
+        if selected_filter:
+            results = [r for r in all_results if r["year_display"] == selected_filter]
+        else:
+            results = all_results
+        # Refresh in background for next call
+        refresh_all_stats_in_background()
 
-    # Optionally refresh in background so next call is extremely fast
-    refresh_all_stats_in_background()
-
+    log_debug(f"Returning {len(results)} results", tag="API")
     return {"results": results, "available_years": get_available_year_sections()}
+
+
+def get_stats_from_db(year_filter=None):
+    """
+    Fast database-only stats retrieval for Vercel deployment.
+    Returns cached stats from StudentStats table without making any API calls.
+    """
+    from sqlalchemy import text
+    
+    query = db.session.query(Student, StudentStats).outerjoin(
+        StudentStats, Student.id == StudentStats.student_id
+    )
+    
+    if year_filter:
+        # Parse year filter like "2nd Year (A)" or "3rd Year"
+        parts = year_filter.split(" (")
+        if len(parts) == 2:
+            year_num = int(parts[0][0])  # "2nd Year (A)" -> 2
+            section = parts[1].rstrip(")")  # "(A)" -> "A"
+            query = query.filter(Student.year == year_num, Student.section == section)
+        else:
+            year_num = int(year_filter[0])  # "3rd Year" -> 3
+            query = query.filter(Student.year == year_num)
+    
+    results = []
+    for student, stats in query.all():
+        year = student.year
+        year_suffix = 'st' if year == 1 else 'nd' if year == 2 else 'rd' if year == 3 else 'th'
+        year_str = f"{year}{year_suffix} Year"
+        year_display = f"{year_str} ({student.section})" if student.section else year_str
+        
+        results.append({
+            "roll_no": student.register_number,
+            "actual_name": student.name,
+            "username": student.leetcode_username,
+            "year": year_str,
+            "year_display": year_display,
+            "year_number": year,
+            "section": student.section,
+            "easy": stats.easy_solved if stats else 0,
+            "medium": stats.medium_solved if stats else 0,
+            "hard": stats.hard_solved if stats else 0,
+            "total": stats.total_solved if stats else 0,
+            "fetch_error": None,
+            "is_stale": stats.is_stale if stats else True,
+            "fetched_at": int(stats.last_updated.timestamp()) if stats and stats.last_updated else 0
+        })
+    
+    # Sort by total solved descending
+    results.sort(key=lambda x: x["total"], reverse=True)
+    return results
 
 
 # -----------------------
