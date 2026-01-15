@@ -957,6 +957,9 @@ def api_cron_weekly_reports():
     - URL: https://your-app.vercel.app/api/cron/weekly-reports?secret=YOUR_SECRET
     - Method: GET or POST
     - Schedule: Every Monday at 8:00 AM
+    
+    Optional params:
+    - send_email=true (default: false on Vercel to avoid timeout)
     """
     import os
     
@@ -971,35 +974,51 @@ def api_cron_weekly_reports():
             'message': 'Unauthorized - invalid or missing secret'
         }), 401
     
-    from app.reports import generate_all_weekly_reports, get_report_email_html
-    from app.email_service import send_report_email, is_email_configured
-    
     try:
-        reports = generate_all_weekly_reports()
+        from app.reports import generate_all_weekly_reports, get_report_email_html
+        from app.email_service import send_report_email, is_email_configured
         
+        log_info("Starting weekly report generation via cron", tag="Cron")
+        
+        reports = generate_all_weekly_reports()
+        log_info(f"Generated {len(reports)} reports", tag="Cron")
+        
+        # Send emails by default (use send_email=false to skip)
+        send_emails = request.args.get('send_email', 'true').lower() != 'false'
         email_results = []
-        if is_email_configured():
+        
+        if send_emails and is_email_configured():
             for report in reports:
-                html_content = get_report_email_html(report)
-                success, message = send_report_email(report, html_content)
-                email_results.append({
-                    'year': report.year,
-                    'section': report.section,
-                    'email_sent': success,
-                    'message': message
-                })
+                try:
+                    html_content = get_report_email_html(report)
+                    success, message = send_report_email(report, html_content)
+                    email_results.append({
+                        'year': report.year,
+                        'section': report.section,
+                        'email_sent': success,
+                        'message': message
+                    })
+                except Exception as email_err:
+                    log_error(f"Email error for year {report.year}: {email_err}", tag="Cron")
+                    email_results.append({
+                        'year': report.year,
+                        'section': report.section,
+                        'email_sent': False,
+                        'message': str(email_err)
+                    })
         
         return jsonify({
             'success': True,
             'message': f'Generated {len(reports)} reports',
             'reports_count': len(reports),
+            'email_sent': send_emails,
             'email_results': email_results,
             'timestamp': datetime.utcnow().isoformat()
         })
         
     except Exception as e:
         import traceback
-        print(f"[Cron] Error generating weekly reports: {traceback.format_exc()}")
+        log_error(f"Error generating weekly reports: {traceback.format_exc()}", tag="Cron")
         return jsonify({
             'success': False, 
             'message': str(e)
