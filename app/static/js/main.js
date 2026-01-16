@@ -366,8 +366,10 @@ function animateCounter(elementId, targetValue) {
 }
 
 // Load data from API
-function loadData(year = '') {
-  showLoading();
+function loadData(year = '', showLoadingScreen = true) {
+  if (showLoadingScreen) {
+    showLoading();
+  }
 
   fetch('/api/stats' + (year ? '?year=' + encodeURIComponent(year) : ''))
     .then(response => response.json())
@@ -381,17 +383,65 @@ function loadData(year = '') {
       updateStatsOverview(data.results);
       document.getElementById('downloadLink').href = '/download' + (year ? '?year=' + encodeURIComponent(year) : '');
 
-      // Minimum loading time for better UX
-      setTimeout(() => {
-        hideLoading();
-      }, 1500);
+      // Update last refresh timestamp
+      updateLastRefreshTime();
+
+      if (showLoadingScreen) {
+        // Minimum loading time for better UX
+        setTimeout(() => {
+          hideLoading();
+        }, 1500);
+      }
     })
     .catch(error => {
       console.error('Error fetching data:', error);
-      setTimeout(() => {
-        hideLoading();
-      }, 1000);
+      if (showLoadingScreen) {
+        setTimeout(() => {
+          hideLoading();
+        }, 1000);
+      }
     });
+}
+
+// Update last refresh timestamp display
+function updateLastRefreshTime() {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString();
+
+  // Create or update the refresh indicator
+  let refreshIndicator = document.getElementById('refreshIndicator');
+  if (!refreshIndicator) {
+    const statsOverview = document.querySelector('.stats-overview');
+    if (statsOverview) {
+      refreshIndicator = document.createElement('div');
+      refreshIndicator.id = 'refreshIndicator';
+      refreshIndicator.style.cssText = 'text-align: center; color: #718096; font-size: 13px; margin-top: 15px; padding: 10px; background: #f0f4f8; border-radius: 8px;';
+      statsOverview.appendChild(refreshIndicator);
+    }
+  }
+  if (refreshIndicator) {
+    refreshIndicator.innerHTML = `🔄 Last updated: <strong>${timeStr}</strong> (auto-refreshes every 2 min)`;
+  }
+}
+
+// Auto-refresh interval (2 minutes = 120000ms)
+let autoRefreshInterval = null;
+const AUTO_REFRESH_INTERVAL = 120000; // 2 minutes
+
+function startAutoRefresh() {
+  // Clear any existing interval
+  if (autoRefreshInterval) {
+    clearInterval(autoRefreshInterval);
+  }
+
+  // Start auto-refresh
+  autoRefreshInterval = setInterval(() => {
+    const selectedYear = document.getElementById('year')?.value || '';
+    console.log('Auto-refreshing data...');
+    loadData(selectedYear, false); // false = don't show loading screen
+  }, AUTO_REFRESH_INTERVAL);
+
+  console.log('Auto-refresh started (every 2 minutes)');
 }
 
 // Initialize
@@ -405,6 +455,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Initial load
   loadData();
+
+  // Start auto-refresh
+  startAutoRefresh();
 });
 
 // Client-side table search (filter as you type)
