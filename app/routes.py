@@ -1148,15 +1148,22 @@ def api_cron_refresh_stats():
     External cron endpoint to trigger stats refresh.
     For Vercel serverless where APScheduler doesn't work.
     
+    Processes students in batches to avoid Vercel's 10s timeout.
+    
     Security: Set CRON_SECRET env var and pass it as ?secret=xxx
     
     Usage with cron-job.org:
     - URL: https://your-app.vercel.app/api/cron/refresh-stats?secret=YOUR_SECRET
     - Method: GET or POST
-    - Schedule: Every 30 minutes (or as desired)
+    - Schedule: Every 5 minutes (to cycle through all students)
+    
+    Query params:
+    - batch_size: Number of students per batch (default: 20)
+    - offset: Starting offset for pagination (auto-managed via state)
     """
     import os
     import time as time_module
+    import asyncio
     
     # Simple secret-based auth for cron jobs
     cron_secret = os.environ.get('CRON_SECRET', '')
@@ -1170,25 +1177,114 @@ def api_cron_refresh_stats():
         }), 401
     
     try:
-        log_info("Starting stats refresh via cron", tag="Cron")
+        from app.leetcode_api import fetch_students_concurrent
         
-        # Clear cache
-        try:
-            cache.clear()
-        except Exception:
-            pass
+        batch_size = int(request.args.get('batch_size', 20))
         
-        # Fetch fresh stats
+        log_info(f"Starting batched stats refresh via cron (batch_size={batch_size})", tag="Cron")
+        
+        # Get all students
+        students = load_students_from_db()
+        total_students = len(students)
+        
+        if total_students == 0:
+            return jsonify({
+                'success': True,
+                'message': 'No students to refresh',
+                'students_updated': 0
+            })
+        
+        # Get current offset from a simple rotating mechanism
+        # We'll use the current minute to determine which batch to process
+        current_minute = datetime.utcnow().minute
+        batches_needed = (total_students + batch_size - 1) // batch_size
+        current_batch = current_minute % batches_needed if batches_needed > 0 else 0
+        offset = current_batch * batch_size
+        
+        # Get the batch of students to process
+        batch_students = students[offset:offset + batch_size]
+        
+        if not batch_students:
+            batch_students = students[:batch_size]  # Wrap around
+            offset = 0
+        
+        log_info(f"Processing batch {current_batch + 1}/{batches_needed}: students {offset} to {offset + len(batch_students)}", tag="Cron")
+        
+        # Build student ID map for DB updates
+        student_id_map = {}
+        for student in Student.query.all():
+            if student.leetcode_username:
+                student_id_map[student.leetcode_username.strip().lower()] = student.id
+        
+        # Load existing cached stats for fallback
+        db_stats_map = {}
+        for stats in StudentStats.query.all():
+            if stats.student:
+                uname = (stats.student.leetcode_username or "").strip().lower()
+                db_stats_map[uname] = {
+                    "easy_solved": stats.easy_solved,
+                    "medium_solved": stats.medium_solved,
+                    "hard_solved": stats.hard_solved,
+                    "total_solved": stats.total_solved
+                }
+        
+        # Fetch this batch
         start_time = time_module.time()
-        results = get_all_stats()
+        try:
+            fetched = asyncio.run(fetch_students_concurrent(
+                batch_students,
+                cached_stats_map=db_stats_map,
+                concurrency=10  # Lower concurrency for reliability
+            ))
+        except Exception as e:
+            log_error(f"Batch fetch failed: {e}", tag="Cron")
+            fetched = []
+        
+        # Update database with fetched results
+        updated_count = 0
+        for item in fetched:
+            try:
+                uname = (item.get("username") or "").strip().lower()
+                is_stale = item.get("is_stale", False)
+                has_error = item.get("fetch_error") is not None
+                
+                if not is_stale and not has_error:
+                    student_id = student_id_map.get(uname)
+                    if student_id:
+                        stats = StudentStats.query.filter_by(student_id=student_id).first()
+                        if not stats:
+                            stats = StudentStats(student_id=student_id)
+                            db.session.add(stats)
+                        
+                        stats.easy_solved = item.get("easy", 0)
+                        stats.medium_solved = item.get("medium", 0)
+                        stats.hard_solved = item.get("hard", 0)
+                        stats.total_solved = item.get("total", 0)
+                        stats.last_updated = datetime.utcnow()
+                        stats.is_stale = False
+                        updated_count += 1
+            except Exception as e:
+                log_error(f"Error updating stats for {uname}: {e}", tag="Cron")
+        
+        # Commit database changes
+        try:
+            db.session.commit()
+        except Exception as e:
+            log_error(f"Error committing stats: {e}", tag="Cron")
+            db.session.rollback()
+        
         elapsed = time_module.time() - start_time
         
-        log_info(f"Stats refresh via cron completed: {len(results)} students in {elapsed:.1f}s", tag="Cron")
+        log_info(f"Batch refresh completed: {updated_count}/{len(batch_students)} updated in {elapsed:.1f}s", tag="Cron")
         
         return jsonify({
             'success': True,
-            'message': f'Refreshed stats for {len(results)} students in {elapsed:.1f} seconds',
-            'students_updated': len(results),
+            'message': f'Batch {current_batch + 1}/{batches_needed}: Updated {updated_count} students in {elapsed:.1f}s',
+            'batch': current_batch + 1,
+            'total_batches': batches_needed,
+            'students_in_batch': len(batch_students),
+            'students_updated': updated_count,
+            'total_students': total_students,
             'elapsed_seconds': round(elapsed, 1),
             'timestamp': datetime.utcnow().isoformat()
         })
@@ -1200,3 +1296,4 @@ def api_cron_refresh_stats():
             'success': False, 
             'message': str(e)
         }), 500
+
