@@ -154,7 +154,10 @@ def get_all_stats(cache_ttl=CACHE_TTL, concurrency=CONCURRENCY, timeout_seconds=
                 cache.set(cache_key, item, timeout=cache_ttl)
                 
                 # Save to database (for fallback on future failures)
-                if not item.get("is_stale") and item.get("total", 0) > 0 or not item.get("fetch_error"):
+                # Only update DB if we got fresh data (not stale) and there's no error
+                is_stale = item.get("is_stale", False)
+                has_error = item.get("fetch_error") is not None
+                if not is_stale and not has_error:
                     student_id = student_id_map.get(uname)
                     if student_id:
                         stats = StudentStats.query.filter_by(student_id=student_id).first()
@@ -371,6 +374,70 @@ def student_profile(register_number):
     except Exception as e:
         flash(f'Error fetching student stats: {str(e)}', 'error')
         return redirect(url_for('index'))
+
+
+@app.route("/api/refresh-student/<register_number>", methods=['POST'])
+def api_refresh_single_student(register_number):
+    """
+    Quickly refresh stats for a single student.
+    Much faster than refreshing everyone!
+    """
+    student = Student.query.filter_by(register_number=register_number).first()
+    
+    if not student:
+        return jsonify({'success': False, 'message': 'Student not found'}), 404
+    
+    username = student.leetcode_username
+    
+    if not username or username.lower() == "higher studies":
+        return jsonify({'success': False, 'message': 'Invalid LeetCode username'}), 400
+    
+    try:
+        # Clear this student's cache entry
+        cache_key = f"stats:{username.strip().lower()}"
+        try:
+            cache.delete(cache_key)
+        except Exception:
+            pass
+        
+        # Fetch fresh stats from API
+        stats = fetch_detailed_leetcode_stats(username)
+        
+        if stats:
+            # Update database
+            student_stats = StudentStats.query.filter_by(student_id=student.id).first()
+            if not student_stats:
+                student_stats = StudentStats(student_id=student.id)
+                db.session.add(student_stats)
+            
+            student_stats.easy_solved = stats.get('easySolved', 0)
+            student_stats.medium_solved = stats.get('mediumSolved', 0)
+            student_stats.hard_solved = stats.get('hardSolved', 0)
+            student_stats.total_solved = stats.get('totalSolved', 0)
+            student_stats.last_updated = datetime.utcnow()
+            student_stats.is_stale = False
+            
+            db.session.commit()
+            
+            log_info(f"Refreshed stats for {username}: {stats.get('totalSolved', 0)} total solved", tag="API")
+            
+            return jsonify({
+                'success': True,
+                'message': f"Stats updated! Total solved: {stats.get('totalSolved', 0)}",
+                'stats': {
+                    'easy': stats.get('easySolved', 0),
+                    'medium': stats.get('mediumSolved', 0),
+                    'hard': stats.get('hardSolved', 0),
+                    'total': stats.get('totalSolved', 0)
+                }
+            })
+        else:
+            return jsonify({'success': False, 'message': 'Failed to fetch stats from LeetCode API'}), 500
+            
+    except Exception as e:
+        db.session.rollback()
+        log_error(f"Error refreshing stats for {username}: {e}", tag="API")
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 
 @app.route("/admin")
@@ -719,6 +786,42 @@ def admin_logs():
     return render_template("admin_logs.html", logs=logs)
 
 
+@app.route("/admin/refresh-stats", methods=['POST'])
+def admin_refresh_stats():
+    """Force refresh all student stats from LeetCode API"""
+    if not session.get('hod_authenticated'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 403
+    
+    try:
+        # Clear memory cache
+        try:
+            cache.clear()
+            log_info("Memory cache cleared for admin refresh", tag="Cache")
+        except Exception as e:
+            log_error(f"Failed to clear cache: {e}", tag="Cache")
+        
+        # Fetch fresh stats from API (this will update the database)
+        log_info("Starting admin-triggered stats refresh...", tag="Admin")
+        start_time = time.time()
+        
+        all_results = get_all_stats()
+        
+        elapsed = time.time() - start_time
+        log_info(f"Stats refresh completed in {elapsed:.2f}s, updated {len(all_results)} students", tag="Admin")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully refreshed stats for {len(all_results)} students in {elapsed:.1f} seconds',
+            'students_updated': len(all_results)
+        })
+    except Exception as e:
+        log_error(f"Admin refresh failed: {e}", tag="Admin")
+        return jsonify({
+            'success': False,
+            'message': f'Error refreshing stats: {str(e)}'
+        }), 500
+
+
 @app.route("/download")
 def download_csv():
     selected_filter = request.args.get("year", None)
@@ -754,24 +857,38 @@ def api_stats():
     Fast API endpoint that returns cached database stats immediately.
     On Vercel, we can't wait for live LeetCode API calls (10s timeout).
     Background refresh happens separately.
+    
+    Query params:
+        - year: Filter by year/section (e.g., "2nd Year (A)")
+        - force_refresh: If "1" or "true", clears cache and fetches fresh data from LeetCode API
     """
     selected_filter = request.args.get("year", None)
+    force_refresh = request.args.get("force_refresh", "").lower() in ("1", "true")
     IS_VERCEL = os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV')
 
-    log_debug(f"API called with filter: '{selected_filter}', Vercel: {bool(IS_VERCEL)}", tag="API")
+    log_debug(f"API called with filter: '{selected_filter}', force_refresh: {force_refresh}, Vercel: {bool(IS_VERCEL)}", tag="API")
 
-    if IS_VERCEL:
+    # If force refresh requested, clear the memory cache first
+    if force_refresh:
+        try:
+            cache.clear()
+            log_info("Memory cache cleared for force refresh", tag="Cache")
+        except Exception as e:
+            log_error(f"Failed to clear cache: {e}", tag="Cache")
+
+    if IS_VERCEL and not force_refresh:
         # FAST PATH for Vercel: Return DB cached data immediately
         results = get_stats_from_db(selected_filter)
     else:
-        # Local: Use the full fetcher with live data
+        # Local or force_refresh: Use the full fetcher with live data
         all_results = get_all_stats()
         if selected_filter:
             results = [r for r in all_results if r["year_display"] == selected_filter]
         else:
             results = all_results
-        # Refresh in background for next call
-        refresh_all_stats_in_background()
+        # Refresh in background for next call (only if not already refreshed)
+        if not force_refresh:
+            refresh_all_stats_in_background()
 
     log_debug(f"Returning {len(results)} results", tag="API")
     return {"results": results, "available_years": get_available_year_sections()}
@@ -1025,3 +1142,61 @@ def api_cron_weekly_reports():
         }), 500
 
 
+@app.route("/api/cron/refresh-stats", methods=['POST', 'GET'])
+def api_cron_refresh_stats():
+    """
+    External cron endpoint to trigger stats refresh.
+    For Vercel serverless where APScheduler doesn't work.
+    
+    Security: Set CRON_SECRET env var and pass it as ?secret=xxx
+    
+    Usage with cron-job.org:
+    - URL: https://your-app.vercel.app/api/cron/refresh-stats?secret=YOUR_SECRET
+    - Method: GET or POST
+    - Schedule: Every 30 minutes (or as desired)
+    """
+    import os
+    import time as time_module
+    
+    # Simple secret-based auth for cron jobs
+    cron_secret = os.environ.get('CRON_SECRET', '')
+    provided_secret = request.args.get('secret', '')
+    
+    # Skip auth if no secret is configured (development mode)
+    if cron_secret and provided_secret != cron_secret:
+        return jsonify({
+            'success': False,
+            'message': 'Unauthorized - invalid or missing secret'
+        }), 401
+    
+    try:
+        log_info("Starting stats refresh via cron", tag="Cron")
+        
+        # Clear cache
+        try:
+            cache.clear()
+        except Exception:
+            pass
+        
+        # Fetch fresh stats
+        start_time = time_module.time()
+        results = get_all_stats()
+        elapsed = time_module.time() - start_time
+        
+        log_info(f"Stats refresh via cron completed: {len(results)} students in {elapsed:.1f}s", tag="Cron")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Refreshed stats for {len(results)} students in {elapsed:.1f} seconds',
+            'students_updated': len(results),
+            'elapsed_seconds': round(elapsed, 1),
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        import traceback
+        log_error(f"Error refreshing stats via cron: {traceback.format_exc()}", tag="Cron")
+        return jsonify({
+            'success': False, 
+            'message': str(e)
+        }), 500

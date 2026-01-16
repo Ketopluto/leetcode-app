@@ -416,28 +416,88 @@
     <div class="stats-grid">
       <div class="stat-card easy">
         <div class="stat-icon">✅</div>
-        <div class="stat-value">{{ stats.easySolved }}</div>
+        <div class="stat-value" id="easy-count">{{ stats.easySolved }}</div>
         <div class="stat-label">Easy Solved</div>
       </div>
 
       <div class="stat-card medium">
         <div class="stat-icon">⚡</div>
-        <div class="stat-value">{{ stats.mediumSolved }}</div>
+        <div class="stat-value" id="medium-count">{{ stats.mediumSolved }}</div>
         <div class="stat-label">Medium Solved</div>
       </div>
 
       <div class="stat-card hard">
         <div class="stat-icon">🔥</div>
-        <div class="stat-value">{{ stats.hardSolved }}</div>
+        <div class="stat-value" id="hard-count">{{ stats.hardSolved }}</div>
         <div class="stat-label">Hard Solved</div>
       </div>
 
       <div class="stat-card total">
         <div class="stat-icon">🎯</div>
-        <div class="stat-value">{{ stats.totalSolved }}</div>
+        <div class="stat-value" id="total-count">{{ stats.totalSolved }}</div>
         <div class="stat-label">Total Solved</div>
       </div>
     </div>
+
+    <!-- Quick Refresh Button -->
+    <div style="text-align: center; margin-bottom: 30px;">
+      <button id="refreshBtn" onclick="refreshMyStats()" style="
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 24px;
+        background-color: #10b981;
+        color: #ffffff;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      ">
+        <span>🔄</span>
+        <span>Refresh My Stats</span>
+      </button>
+      <div id="refreshMessage" style="margin-top: 10px; font-size: 14px;"></div>
+    </div>
+
+    <script>
+      async function refreshMyStats() {
+        const btn = document.getElementById('refreshBtn');
+        const msg = document.getElementById('refreshMessage');
+
+        btn.disabled = true;
+        btn.innerHTML = '<span>⏳</span><span>Refreshing...</span>';
+        btn.style.backgroundColor = '#6b7280';
+        msg.innerHTML = '';
+
+        try {
+          const response = await fetch('/api/refresh-student/{{ student.register_number }}', {
+            method: 'POST'
+          });
+          const data = await response.json();
+
+          if (data.success) {
+            msg.innerHTML = '<span style="color: #10b981;">✅ ' + data.message + '</span>';
+            // Update the displayed counts
+            if (data.stats) {
+              document.getElementById('easy-count').textContent = data.stats.easy;
+              document.getElementById('medium-count').textContent = data.stats.medium;
+              document.getElementById('hard-count').textContent = data.stats.hard;
+              document.getElementById('total-count').textContent = data.stats.total;
+            }
+          } else {
+            msg.innerHTML = '<span style="color: #ef4444;">❌ ' + data.message + '</span>';
+          }
+        } catch (error) {
+          msg.innerHTML = '<span style="color: #ef4444;">❌ Error: ' + error.message + '</span>';
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = '<span>🔄</span><span>Refresh My Stats</span>';
+        btn.style.backgroundColor = '#10b981';
+      }
+    </script>
 
     <!-- Progress Bars -->
     {% if stats.totalSolved > 0 %}

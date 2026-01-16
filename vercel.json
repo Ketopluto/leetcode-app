@@ -14,5 +14,15 @@
       "src": "/(.*)",
       "dest": "app/main.py"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/refresh-stats",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/weekly-reports",
+      "schedule": "0 8 * * 1"
+    }
   ]
 }

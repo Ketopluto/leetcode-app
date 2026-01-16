@@ -426,6 +426,22 @@
       {% endfor %}
     </div>
 
+    <!-- Refresh Stats Section -->
+    <div class="upload-section" style="margin-bottom: 30px;">
+      <h2>🔄 Refresh LeetCode Stats</h2>
+      <p style="color: #4a5568; margin-bottom: 20px;">
+        Fetch the latest LeetCode statistics for all students. This clears the cache and updates the database with fresh
+        data from the LeetCode API.
+      </p>
+      <div id="refresh-message-container"></div>
+      <button id="refreshStatsBtn" class="submit-btn" style="background-color: #3b82f6; margin-top: 0;">
+        🔄 Refresh All Stats Now
+      </button>
+      <p style="color: #718096; font-size: 13px; margin-top: 15px;">
+        <strong>Note:</strong> This may take a minute or two depending on the number of students.
+      </p>
+    </div>
+
     <div class="upload-section">
       <h2>📤 Upload Student Data</h2>
 
@@ -599,6 +615,50 @@
         submitBtn.disabled = false;
         submitBtn.textContent = 'Upload and Process';
       }
+    });
+
+    // Refresh Stats Button Handler
+    const refreshStatsBtn = document.getElementById('refreshStatsBtn');
+    const refreshMessageContainer = document.getElementById('refresh-message-container');
+
+    refreshStatsBtn.addEventListener('click', async function () {
+      refreshStatsBtn.disabled = true;
+      refreshStatsBtn.textContent = '⏳ Refreshing... Please wait...';
+      refreshMessageContainer.innerHTML = '';
+
+      try {
+        const response = await fetch('/admin/refresh-stats', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          refreshMessageContainer.innerHTML = `
+            <div class="alert alert-success">
+              ✅ ${data.message}
+            </div>
+          `;
+        } else {
+          refreshMessageContainer.innerHTML = `
+            <div class="alert alert-error">
+              ❌ ${data.message}
+            </div>
+          `;
+        }
+      } catch (error) {
+        refreshMessageContainer.innerHTML = `
+          <div class="alert alert-error">
+            ❌ Error refreshing stats: ${error.message}
+          </div>
+        `;
+      }
+
+      refreshStatsBtn.disabled = false;
+      refreshStatsBtn.textContent = '🔄 Refresh All Stats Now';
     });
   </script>
 </body>
