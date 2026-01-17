@@ -1184,9 +1184,10 @@ def api_cron_refresh_stats():
         if total == 0:
             return {"ok": True, "n": 0}
         
-        # Rotate batches based on minute
+        # Rotate batches based on minute (adjusted for 2-min cron interval)
         batches = (total + batch_size - 1) // batch_size
-        batch_num = datetime.utcnow().minute % batches if batches > 0 else 0
+        # Divide minute by 2 to handle 2-minute cron intervals correctly
+        batch_num = (datetime.utcnow().minute // 2) % batches if batches > 0 else 0
         offset = batch_num * batch_size
         
         batch = students[offset:offset + batch_size] or students[:batch_size]
