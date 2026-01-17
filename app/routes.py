@@ -1169,7 +1169,7 @@ def api_cron_refresh_stats():
     provided_secret = request.args.get('secret', '')
     
     if cron_secret and provided_secret != cron_secret:
-        return {"ok": False, "err": "auth"}, 401
+        return jsonify({"ok": False, "err": "auth"}), 401
     
     try:
         from app.leetcode_api import fetch_students_concurrent
@@ -1246,8 +1246,10 @@ def api_cron_refresh_stats():
         
         elapsed = time_module.time() - start
         
-        # Minimal response to stay under 64KB limit
-        return {"ok": True, "b": batch_num + 1, "of": batches, "n": updated, "t": round(elapsed, 1)}
+        # Minimal response with proper headers for cron-job.org
+        response = jsonify({"ok": True, "b": batch_num + 1, "of": batches, "n": updated, "t": round(elapsed, 1)})
+        response.headers['Connection'] = 'close'
+        return response
         
     except Exception as e:
         import traceback
