@@ -415,12 +415,26 @@ function updateLastRefreshTime() {
     if (statsOverview) {
       refreshIndicator = document.createElement('div');
       refreshIndicator.id = 'refreshIndicator';
-      refreshIndicator.style.cssText = 'text-align: center; color: #718096; font-size: 13px; margin-top: 15px; padding: 10px; background: #f0f4f8; border-radius: 8px;';
+      refreshIndicator.className = 'stat-card';
+      refreshIndicator.style.cssText = `
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        min-height: 120px;
+      `;
       statsOverview.appendChild(refreshIndicator);
     }
   }
   if (refreshIndicator) {
-    refreshIndicator.innerHTML = `🔄 Last updated: <strong>${timeStr}</strong> (auto-refreshes every 2 min)`;
+    refreshIndicator.innerHTML = `
+      <div style="font-size: 28px; margin-bottom: 8px;">🔄</div>
+      <div style="font-size: 24px; font-weight: 700; margin-bottom: 4px;">${timeStr}</div>
+      <div style="font-size: 13px; opacity: 0.9;">Auto-refreshes every 2 min</div>
+    `;
   }
 }
 
