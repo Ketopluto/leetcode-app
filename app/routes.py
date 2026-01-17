@@ -1182,16 +1182,22 @@ def api_cron_refresh_stats():
         if not batch_students:
             batch_students = Student.query.order_by(Student.id).limit(batch_size).all()
         
-        # Build minimal data for API fetch
+        # Build minimal data for API fetch - must be tuples!
+        # Format: (username, name, roll, year, section, student_id)
         batch_data = []
         student_ids = []
         for s in batch_students:
             if s.leetcode_username:
-                batch_data.append({
-                    "username": s.leetcode_username,
-                    "roll_no": s.register_number,
-                    "name": s.name
-                })
+                year_suffix = 'st' if s.year == 1 else 'nd' if s.year == 2 else 'rd' if s.year == 3 else 'th'
+                year_str = f"{s.year}{year_suffix} Year"
+                batch_data.append((
+                    s.leetcode_username,
+                    s.name,
+                    s.register_number,
+                    year_str,
+                    s.section,
+                    s.id
+                ))
                 student_ids.append(s.id)
         
         if not batch_data:
