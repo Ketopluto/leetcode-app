@@ -1145,26 +1145,15 @@ def api_cron_weekly_reports():
 @app.route("/api/cron/refresh-stats", methods=['POST', 'GET'])
 def api_cron_refresh_stats():
     """
-    External cron endpoint to trigger stats refresh.
-    Optimized for free tier limits:
-    - Vercel: 10s timeout
-    - cron-job.org free: 30s timeout, 64KB response limit
-    
-    Security: Set CRON_SECRET env var and pass it as ?secret=xxx
-    
-    Usage with cron-job.org:
-    - URL: https://your-app.vercel.app/api/cron/refresh-stats?secret=YOUR_SECRET
-    - Method: GET
-    - Schedule: Every 2-3 minutes (to cycle through all students)
-    
-    Query params:
-    - batch_size: Number of students per batch (default: 5 for reliability)
+    External cron endpoint - optimized for Vercel cold starts.
+    Uses paginated DB queries to avoid loading all students.
     """
     import os
     import time as time_module
     import asyncio
     
-    # Simple secret-based auth for cron jobs
+    start_total = time_module.time()
+    
     cron_secret = os.environ.get('CRON_SECRET', '')
     provided_secret = request.args.get('secret', '')
     
@@ -1174,88 +1163,101 @@ def api_cron_refresh_stats():
     try:
         from app.leetcode_api import fetch_students_concurrent
         
-        # Small batch size to stay under Vercel's 10s timeout
-        batch_size = int(request.args.get('batch_size', 5))
-        batch_size = min(batch_size, 10)  # Cap at 10 max
+        batch_size = min(int(request.args.get('batch_size', 5)), 10)
         
-        students = load_students_from_db()
-        total = len(students)
+        # Count total students efficiently
+        total = Student.query.count()
         
         if total == 0:
-            return {"ok": True, "n": 0}
+            return jsonify({"ok": True, "n": 0})
         
-        # Rotate batches based on minute (adjusted for 2-min cron interval)
+        # Calculate which batch to process
         batches = (total + batch_size - 1) // batch_size
-        # Divide minute by 2 to handle 2-minute cron intervals correctly
         batch_num = (datetime.utcnow().minute // 2) % batches if batches > 0 else 0
         offset = batch_num * batch_size
         
-        batch = students[offset:offset + batch_size] or students[:batch_size]
+        # Query ONLY the batch we need (not all students)
+        batch_students = Student.query.order_by(Student.id).offset(offset).limit(batch_size).all()
         
-        # Build lookup maps efficiently
-        id_map = {s.leetcode_username.strip().lower(): s.id 
-                  for s in Student.query.all() if s.leetcode_username}
+        if not batch_students:
+            batch_students = Student.query.order_by(Student.id).limit(batch_size).all()
         
+        # Build minimal data for API fetch
+        batch_data = []
+        student_ids = []
+        for s in batch_students:
+            if s.leetcode_username:
+                batch_data.append({
+                    "username": s.leetcode_username,
+                    "roll_no": s.register_number,
+                    "name": s.name
+                })
+                student_ids.append(s.id)
+        
+        if not batch_data:
+            return jsonify({"ok": True, "b": batch_num + 1, "of": batches, "n": 0, "t": 0})
+        
+        # Get only stats for THIS batch
+        existing_stats = {st.student_id: st for st in 
+                        StudentStats.query.filter(StudentStats.student_id.in_(student_ids)).all()}
+        
+        # Build cached stats map for the fetcher
         stats_map = {}
-        for st in StudentStats.query.all():
-            if st.student and st.student.leetcode_username:
-                k = st.student.leetcode_username.strip().lower()
-                stats_map[k] = {
+        for s in batch_students:
+            if s.id in existing_stats:
+                st = existing_stats[s.id]
+                stats_map[s.leetcode_username.lower()] = {
                     "easy_solved": st.easy_solved,
                     "medium_solved": st.medium_solved,
                     "hard_solved": st.hard_solved,
                     "total_solved": st.total_solved
                 }
         
-        # Fetch with low concurrency for reliability
-        start = time_module.time()
+        # Fetch from LeetCode API
         try:
             fetched = asyncio.run(fetch_students_concurrent(
-                batch,
+                batch_data,
                 cached_stats_map=stats_map,
-                concurrency=3  # Very low concurrency for speed
+                concurrency=3
             ))
         except Exception:
             fetched = []
         
-        # Update DB
+        # Update database
         updated = 0
         for item in fetched:
-            uname = (item.get("username") or "").strip().lower()
             if item.get("is_stale") or item.get("fetch_error"):
                 continue
-            sid = id_map.get(uname)
-            if not sid:
-                continue
-            st = StudentStats.query.filter_by(student_id=sid).first()
-            if not st:
-                st = StudentStats(student_id=sid)
-                db.session.add(st)
-            st.easy_solved = item.get("easy", 0)
-            st.medium_solved = item.get("medium", 0)
-            st.hard_solved = item.get("hard", 0)
-            st.total_solved = item.get("total", 0)
-            st.last_updated = datetime.utcnow()
-            st.is_stale = False
-            updated += 1
+            
+            uname = (item.get("username") or "").strip().lower()
+            # Find matching student
+            for s in batch_students:
+                if s.leetcode_username and s.leetcode_username.lower() == uname:
+                    st = existing_stats.get(s.id)
+                    if not st:
+                        st = StudentStats(student_id=s.id)
+                        db.session.add(st)
+                    st.easy_solved = item.get("easy", 0)
+                    st.medium_solved = item.get("medium", 0)
+                    st.hard_solved = item.get("hard", 0)
+                    st.total_solved = item.get("total", 0)
+                    st.last_updated = datetime.utcnow()
+                    st.is_stale = False
+                    updated += 1
+                    break
         
         try:
             db.session.commit()
         except Exception:
             db.session.rollback()
         
-        elapsed = time_module.time() - start
+        elapsed = round(time_module.time() - start_total, 1)
         
-        # Minimal response with proper headers for cron-job.org
-        response = jsonify({"ok": True, "b": batch_num + 1, "of": batches, "n": updated, "t": round(elapsed, 1)})
+        response = jsonify({"ok": True, "b": batch_num + 1, "of": batches, "n": updated, "t": elapsed})
         response.headers['Connection'] = 'close'
         return response
         
     except Exception as e:
         import traceback
-        log_error(f"Error refreshing stats via cron: {traceback.format_exc()}", tag="Cron")
-        return jsonify({
-            'success': False, 
-            'message': str(e)
-        }), 500
-
+        log_error(f"Cron error: {traceback.format_exc()}", tag="Cron")
+        return jsonify({"ok": False, "err": str(e)[:100]}), 500
