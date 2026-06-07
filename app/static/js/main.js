@@ -343,9 +343,11 @@ function updateStatsOverview(results) {
   const avgProblems = totalUsers > 0 ? Math.round(totalProblems / totalUsers) : 0;
   const errorCount = results.filter(user => user.fetch_error && user.username !== 'higher studies').length;
 
-  animateCounter('totalUsers', totalUsers);
-  animateCounter('totalProblems', totalProblems);
-  animateCounter('avgProblems', avgProblems);
+  if (document.getElementById('totalUsers')) {
+    animateCounter('totalUsers', totalUsers);
+    animateCounter('totalProblems', totalProblems);
+    animateCounter('avgProblems', avgProblems);
+  }
 
   // Log error count for debugging
   if (errorCount > 0) {
@@ -356,6 +358,7 @@ function updateStatsOverview(results) {
 // Animate counter
 function animateCounter(elementId, targetValue) {
   const element = document.getElementById(elementId);
+  if (!element) return;
   const duration = 1000;
   const steps = 50;
   const stepValue = targetValue / steps;
@@ -434,18 +437,21 @@ function updateLastRefreshTime() {
         align-items: center;
         justify-content: center;
         text-align: center;
-        min-height: 120px;
+        min-height: 80px;
+        padding: 12px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        border-radius: 12px;
+        border-radius: 10px;
       `;
       statsOverview.appendChild(refreshIndicator);
     }
   }
   if (refreshIndicator) {
     refreshIndicator.innerHTML = `
-      <div style="font-size: 28px; margin-bottom: 8px;">🔄</div>
-      <div style="font-size: 24px; font-weight: 700; margin-bottom: 4px;">${timeStr}</div>
-      <div style="font-size: 13px; opacity: 0.9;">Auto-refreshes every 2 min</div>
+      <div style="margin-bottom: 4px; color: #475569;">
+        <svg class="icon" style="width:20px; height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      </div>
+      <div style="font-size: 16px; font-weight: 700; margin-bottom: 2px;">${timeStr}</div>
+      <div style="font-size: 11px; opacity: 0.85;">Auto-refreshes every 2 min</div>
     `;
   }
 }
@@ -500,7 +506,7 @@ document.addEventListener('DOMContentLoaded', function () {
     searchBar.innerHTML = `
       <input type="text" 
              id="tableSearch" 
-             placeholder="🔍 Filter table..." 
+             placeholder="Filter table..." 
              style="flex: 1; padding: 12px 16px; border: 2px solid #cbd5e0; border-radius: 8px; font-size: 15px;">
       <span id="tableCount" style="color: #718096; font-size: 14px; min-width: 150px;"></span>
     `;
