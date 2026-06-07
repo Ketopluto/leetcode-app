@@ -451,6 +451,10 @@
                   <span>✏️</span>
                   <span>Edit</span>
                 </a>
+                <button onclick="refreshStudent('{{ student.register_number }}', this)" class="btn btn-edit" style="background-color: #10b981;">
+                  <span>🔄</span>
+                  <span>Refresh</span>
+                </button>
                 <button onclick="deleteStudent({{ student.id }}, '{{ student.name }}')" class="btn btn-delete">
                   <span>🗑️</span>
                   <span>Delete</span>
@@ -532,6 +536,32 @@
         }
       } catch (error) {
         alert('Error deleting student: ' + error.message);
+      }
+    }
+
+    async function refreshStudent(registerNumber, btnElement) {
+      const originalText = btnElement.innerHTML;
+      btnElement.innerHTML = '<span>⏳</span><span>Loading...</span>';
+      btnElement.disabled = true;
+
+      try {
+        const response = await fetch(`/api/refresh-student/${registerNumber}`, {
+          method: 'POST',
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          alert(data.message);
+          window.location.reload();
+        } else {
+          alert('Error: ' + data.message);
+          btnElement.innerHTML = originalText;
+          btnElement.disabled = false;
+        }
+      } catch (error) {
+        alert('Error refreshing student: ' + error.message);
+        btnElement.innerHTML = originalText;
+        btnElement.disabled = false;
       }
     }
   </script>
