@@ -1163,7 +1163,7 @@ def api_cron_refresh_stats():
     try:
         from app.leetcode_api import fetch_students_concurrent
         
-        batch_size = min(int(request.args.get('batch_size', 5)), 10)
+        batch_size = min(int(request.args.get('batch_size', 20)), 50)
         
         # Count total students efficiently
         total = Student.query.count()
@@ -1171,16 +1171,17 @@ def api_cron_refresh_stats():
         if total == 0:
             return jsonify({"ok": True, "n": 0})
         
-        # Calculate which batch to process
-        batches = (total + batch_size - 1) // batch_size
-        batch_num = (datetime.utcnow().minute // 2) % batches if batches > 0 else 0
-        offset = batch_num * batch_size
-        
-        # Query ONLY the batch we need (not all students)
-        batch_students = Student.query.order_by(Student.id).offset(offset).limit(batch_size).all()
+        from sqlalchemy import asc
+        # Prioritize students without stats, then those with the oldest last_updated timestamp
+        batch_students = db.session.query(Student).outerjoin(
+            StudentStats, Student.id == StudentStats.student_id
+        ).order_by(
+            StudentStats.last_updated.is_(None).desc(),
+            asc(StudentStats.last_updated)
+        ).limit(batch_size).all()
         
         if not batch_students:
-            batch_students = Student.query.order_by(Student.id).limit(batch_size).all()
+            return jsonify({"ok": True, "n": 0, "t": 0})
         
         # Build minimal data for API fetch - must be tuples!
         # Format: (username, name, roll, year, section, student_id)
@@ -1201,7 +1202,7 @@ def api_cron_refresh_stats():
                 student_ids.append(s.id)
         
         if not batch_data:
-            return jsonify({"ok": True, "b": batch_num + 1, "of": batches, "n": 0, "t": 0})
+            return jsonify({"ok": True, "n": 0, "t": 0})
         
         # Get only stats for THIS batch
         existing_stats = {st.student_id: st for st in 
@@ -1259,7 +1260,7 @@ def api_cron_refresh_stats():
         
         elapsed = round(time_module.time() - start_total, 1)
         
-        response = jsonify({"ok": True, "b": batch_num + 1, "of": batches, "n": updated, "t": elapsed})
+        response = jsonify({"ok": True, "n": updated, "t": elapsed})
         response.headers['Connection'] = 'close'
         return response
         
