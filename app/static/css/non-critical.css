@@ -177,32 +177,17 @@
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
-.leaderboard-list li:nth-child(1) {
-  border-left-color: #fbbf24;
-  background-color: #fffbeb;
-}
 
-.leaderboard-list li:nth-child(1):hover {
-  background-color: #fef3c7;
-}
 
-.leaderboard-list li:nth-child(2) {
-  border-left-color: #94a3b8;
-  background-color: #f8fafc;
-}
 
-.leaderboard-list li:nth-child(2):hover {
-  background-color: #e2e8f0;
-}
 
-.leaderboard-list li:nth-child(3) {
-  border-left-color: #fb923c;
-  background-color: #fff7ed;
-}
 
-.leaderboard-list li:nth-child(3):hover {
-  background-color: #ffedd5;
-}
+
+
+
+
+
+
 
 /* Stats Overview Cards */
 .stats-overview {
@@ -230,23 +215,13 @@
   box-shadow: 0 8px 20px rgba(59, 130, 246, 0.35);
 }
 
-.stat-card:nth-child(2) {
-  background-color: #10b981;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
-}
 
-.stat-card:nth-child(2):hover {
-  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.35);
-}
 
-.stat-card:nth-child(3) {
-  background-color: #f59e0b;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
-}
 
-.stat-card:nth-child(3):hover {
-  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.35);
-}
+
+
+
+
 
 .stat-icon {
   font-size: 40px;
@@ -322,24 +297,14 @@ tbody tr:hover {
   background-color: #f7fafc;
 }
 
-tbody tr.highlight {
-  background-color: #fef3c7 !important;
-  font-weight: 600;
-  color: #92400e;
-}
+tbody tr{ background-color: #f1f5f9 !important; font-weight: 600; color: #1e293b; border-left: 3px solid #3b82f6; }
 
-tbody tr.highlight:hover {
-  background-color: #fde68a !important;
-}
+tbody tr{ background-color: #e2e8f0 !important; }
 
 /* Error row for invalid LeetCode usernames */
-tbody tr.error-row {
-  background-color: #fee2e2 !important;
-}
+tbody tr{ background-color: #f8fafc !important; color: #64748b; }
 
-tbody tr.error-row:hover {
-  background-color: #fecaca !important;
-}
+tbody tr{ background-color: #f1f5f9 !important; }
 
 /* Download Section */
 .download-section {
@@ -354,7 +319,7 @@ tbody tr.error-row:hover {
   align-items: center;
   gap: 10px;
   padding: 14px 32px;
-  background-color: #10b981;
+  background-color: #3b82f6;
   color: #ffffff;
   text-decoration: none;
   border-radius: 10px;
@@ -365,7 +330,7 @@ tbody tr.error-row:hover {
 }
 
 .download-btn:hover {
-  background-color: #059669;
+  background-color: #3b82f6;
   transform: translateY(-3px);
   box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
 }
@@ -454,3 +419,7 @@ select:focus {
 .student-name-link:hover::after {
   opacity: 1;
 }
+
+
+.icon { width: 1.2em; height: 1.2em; vertical-align: -0.125em; display: inline-block; }
+.icon.inline { width: 1em; height: 1em; }

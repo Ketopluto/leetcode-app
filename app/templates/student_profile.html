@@ -168,7 +168,7 @@
     }
 
     .stat-card.hard .stat-value {
-      color: #ef4444;
+      color: #64748b;
     }
 
     .stat-card.total .stat-value {
@@ -255,7 +255,7 @@
     }
 
     .difficulty-hard {
-      border-left-color: #ef4444;
+      border-left-color: #64748b;
     }
 
     /* Progress Bars */
@@ -288,7 +288,7 @@
     }
 
     .progress-bar.easy {
-      background-color: #10b981;
+      background-color: #3b82f6;
     }
 
     .progress-bar.medium {
@@ -296,7 +296,7 @@
     }
 
     .progress-bar.hard {
-      background-color: #ef4444;
+      background-color: #64748b;
     }
 
     /* External Link Button */
@@ -446,7 +446,7 @@
         align-items: center;
         gap: 8px;
         padding: 12px 24px;
-        background-color: #10b981;
+        background-color: #3b82f6;
         color: #ffffff;
         border: none;
         border-radius: 8px;
@@ -487,10 +487,10 @@
               document.getElementById('total-count').textContent = data.stats.total;
             }
           } else {
-            msg.innerHTML = '<span style="color: #ef4444;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> ' + data.message + '</span>';
+            msg.innerHTML = '<span style="color: #64748b;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> ' + data.message + '</span>';
           }
         } catch (error) {
-          msg.innerHTML = '<span style="color: #ef4444;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Error: ' + error.message + '</span>';
+          msg.innerHTML = '<span style="color: #64748b;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Error: ' + error.message + '</span>';
         }
 
         btn.disabled = false;

@@ -61,41 +61,24 @@ const leetcodeTips = [
   "Read the constraints - they often hint at the expected complexity"
 ];
 
-// Spinner types
-const spinnerTypes = [
-  'circle',
-  'dots',
-  'pulse',
-  'squares',
-  'orbit',
-  'bars',
-  'ring',
-  'bounce'
-];
-
+// Cute animated robot for loading screen
 function getRandomSpinner() {
-  const type = spinnerTypes[Math.floor(Math.random() * spinnerTypes.length)];
-
-  switch (type) {
-    case 'circle':
-      return '<div class="spinner-circle"></div>';
-    case 'dots':
-      return '<div class="spinner-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
-    case 'pulse':
-      return '<div class="spinner-pulse"></div>';
-    case 'squares':
-      return '<div class="spinner-squares">' + '<div class="square"></div>'.repeat(9) + '</div>';
-    case 'orbit':
-      return '<div class="spinner-orbit"><div class="orbit-circle"></div><div class="orbit-circle"></div></div>';
-    case 'bars':
-      return '<div class="spinner-bars">' + '<div class="bar"></div>'.repeat(5) + '</div>';
-    case 'ring':
-      return '<div class="spinner-ring"></div>';
-    case 'bounce':
-      return '<div class="spinner-bounce"><div class="ball"></div><div class="ball"></div><div class="ball"></div></div>';
-    default:
-      return '<div class="spinner-circle"></div>';
-  }
+  return `
+    <div class="cute-loader">
+      <svg width="100" height="100" viewBox="0 0 100 100" style="animation: verticalBounce 0.8s ease-in-out infinite alternate;">
+        <!-- Robot Body -->
+        <rect x="20" y="30" width="60" height="50" rx="10" fill="#cbd5e0"/>
+        <!-- Face screen -->
+        <rect x="28" y="40" width="44" height="30" rx="5" fill="#ffffff"/>
+        <!-- Eyes (Blinking animation via CSS if needed, or static here) -->
+        <circle cx="40" cy="55" r="5" fill="#3b82f6"/>
+        <circle cx="60" cy="55" r="5" fill="#3b82f6"/>
+        <!-- Antenna -->
+        <line x1="50" y1="30" x2="50" y2="15" stroke="#cbd5e0" stroke-width="4"/>
+        <circle cx="50" cy="10" r="6" fill="#3b82f6" style="animation: pulse 1s ease-in-out infinite;"/>
+      </svg>
+    </div>
+  `;
 }
 
 // API endpoints for variety (text + images)
