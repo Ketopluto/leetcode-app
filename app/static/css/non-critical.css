@@ -77,12 +77,12 @@
 }
 
 .year-dropdown:hover {
-  border-color: #3b82f6;
+  border-color: #475569;
 }
 
 .year-dropdown:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: #475569;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
@@ -99,7 +99,7 @@
 
 .apply-btn {
   padding: 12px 28px;
-  background-color: #3b82f6;
+  background-color: #475569;
   color: #ffffff;
   border: none;
   border-radius: 8px;
@@ -111,7 +111,7 @@
 }
 
 .apply-btn:hover {
-  background-color: #2563eb;
+  background-color: #334155;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
 }
@@ -167,7 +167,7 @@
   justify-content: space-between;
   align-items: center;
   transition: all 0.3s ease;
-  border-left: 4px solid #3b82f6;
+  border-left: 4px solid #475569;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
@@ -201,7 +201,7 @@
 }
 
 .stat-card {
-  background-color: #3b82f6;
+  background-color: #475569;
   color: #ffffff;
   padding: 28px;
   border-radius: 12px;
@@ -297,7 +297,7 @@ tbody tr:hover {
   background-color: #f7fafc;
 }
 
-tbody tr{ background-color: #f1f5f9 !important; font-weight: 600; color: #1e293b; border-left: 3px solid #3b82f6; }
+tbody tr{ background-color: #f1f5f9 !important; font-weight: 600; color: #1e293b; border-left: 3px solid #475569; }
 
 tbody tr{ background-color: #e2e8f0 !important; }
 
@@ -319,7 +319,7 @@ tbody tr{ background-color: #f1f5f9 !important; }
   align-items: center;
   gap: 10px;
   padding: 14px 32px;
-  background-color: #3b82f6;
+  background-color: #475569;
   color: #ffffff;
   text-decoration: none;
   border-radius: 10px;
@@ -330,7 +330,7 @@ tbody tr{ background-color: #f1f5f9 !important; }
 }
 
 .download-btn:hover {
-  background-color: #3b82f6;
+  background-color: #475569;
   transform: translateY(-3px);
   box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
 }
@@ -385,7 +385,7 @@ html {
 
 /* Focus styles for accessibility */
 *:focus {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid #475569;
   outline-offset: 2px;
 }
 
@@ -398,7 +398,7 @@ select:focus {
 
 /* Student name link styling */
 .student-name-link {
-  color: #3b82f6;
+  color: #475569;
   text-decoration: none;
   font-weight: 600;
   transition: all 0.3s ease;
@@ -406,7 +406,7 @@ select:focus {
 }
 
 .student-name-link:hover {
-  color: #2563eb;
+  color: #334155;
   text-decoration: underline;
 }
 

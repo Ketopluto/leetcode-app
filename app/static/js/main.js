@@ -71,11 +71,11 @@ function getRandomSpinner() {
         <!-- Face screen -->
         <rect x="28" y="40" width="44" height="30" rx="5" fill="#ffffff"/>
         <!-- Eyes (Blinking animation via CSS if needed, or static here) -->
-        <circle cx="40" cy="55" r="5" fill="#3b82f6"/>
-        <circle cx="60" cy="55" r="5" fill="#3b82f6"/>
+        <circle cx="40" cy="55" r="5" fill="#475569"/>
+        <circle cx="60" cy="55" r="5" fill="#475569"/>
         <!-- Antenna -->
         <line x1="50" y1="30" x2="50" y2="15" stroke="#cbd5e0" stroke-width="4"/>
-        <circle cx="50" cy="10" r="6" fill="#3b82f6" style="animation: pulse 1s ease-in-out infinite;"/>
+        <circle cx="50" cy="10" r="6" fill="#475569" style="animation: pulse 1s ease-in-out infinite;"/>
       </svg>
     </div>
   `;
