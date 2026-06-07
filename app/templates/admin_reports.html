@@ -327,21 +327,21 @@
 <body>
     <nav class="navbar">
         <a href="/" class="navbar-brand">
-            <span>📊</span>
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
             <span>LeetCode Stats</span>
         </a>
         <div class="navbar-links">
-            <a href="/" class="navbar-link"><span>🏠</span><span>Dashboard</span></a>
-            <a href="/admin" class="navbar-link"><span>📤</span><span>Upload</span></a>
-            <a href="/admin/students" class="navbar-link"><span>👥</span><span>Students</span></a>
-            <a href="/admin/reports" class="navbar-link active"><span>📈</span><span>Reports</span></a>
-            <a href="{{ url_for('admin_logout') }}" class="navbar-link logout"><span>🚪</span><span>Logout</span></a>
+            <a href="/" class="navbar-link"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>Dashboard</span></a>
+            <a href="/admin" class="navbar-link"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>Upload</span></a>
+            <a href="/admin/students" class="navbar-link"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Students</span></a>
+            <a href="/admin/reports" class="navbar-link active"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg><span>Reports</span></a>
+            <a href="{{ url_for('admin_logout') }}" class="navbar-link logout"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></a>
         </div>
     </nav>
 
     <div class="admin-container">
         <div class="header-section">
-            <h1>📈 Weekly Reports</h1>
+            <h1><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> Weekly Reports</h1>
             <p>Track student LeetCode activity</p>
         </div>
 
@@ -361,7 +361,7 @@
             </div>
 
             <div class="status-card">
-                <h3>📧 Email Configuration</h3>
+                <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Email Configuration</h3>
                 <div class="value {{ 'success' if email_status.configured else 'error' }}">
                     {{ 'Configured' if email_status.configured else 'Not Configured' }}
                 </div>
@@ -377,14 +377,14 @@
             </div>
 
             <div class="status-card">
-                <h3>📊 Total Reports</h3>
+                <h3><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg> Total Reports</h3>
                 <div class="value" style="color: #3b82f6;">{{ reports | length }}</div>
             </div>
         </div>
 
         {% if not email_status.configured %}
         <div class="alert alert-warning">
-            <strong>⚠️ Email not configured</strong> - Reports will be saved to the dashboard but won't be emailed
+            <strong><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Email not configured</strong> - Reports will be saved to the dashboard but won't be emailed
             automatically.
             Set environment variables: SMTP_USERNAME, SMTP_PASSWORD, HOD_EMAIL
         </div>
@@ -396,12 +396,12 @@
                 <p style="font-size: 13px; color: #718096;">Create weekly reports for all years</p>
             </div>
             <button class="btn btn-primary" id="generateBtn" onclick="generateReports()">
-                <span>📨</span> Generate & Send Reports
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Generate & Send Reports
             </button>
         </div>
 
         <div class="reports-section">
-            <h2>📋 Report History</h2>
+            <h2><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> Report History</h2>
 
             {% if reports %}
             <table>
@@ -447,7 +447,7 @@
             </table>
             {% else %}
             <div class="empty-state">
-                <h3>📭 No Reports Yet</h3>
+                <h3><svg class="icon empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg> No Reports Yet</h3>
                 <p>Click "Generate & Send Reports" to create your first weekly report.</p>
             </div>
             {% endif %}
@@ -460,7 +460,7 @@
             const container = document.getElementById('message-container');
 
             btn.disabled = true;
-            btn.innerHTML = '<span>⏳</span> Generating...';
+            btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Generating...';
             container.innerHTML = '';
 
             try {
@@ -470,7 +470,7 @@
                 if (data.success) {
                     container.innerHTML = `
             <div class="alert alert-info">
-              ✅ ${data.message}
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> ${data.message}
               ${data.email_results && data.email_results.length > 0 ?
                             ` | Emails: ${data.email_results.filter(r => r.email_sent).length}/${data.email_results.length} sent` :
                             ''}
@@ -478,14 +478,14 @@
           `;
                     setTimeout(() => window.location.reload(), 2000);
                 } else {
-                    container.innerHTML = `<div class="alert alert-warning">❌ ${data.message}</div>`;
+                    container.innerHTML = `<div class="alert alert-warning"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> ${data.message}</div>`;
                     btn.disabled = false;
-                    btn.innerHTML = '<span>📨</span> Generate & Send Reports';
+                    btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Generate & Send Reports';
                 }
             } catch (error) {
-                container.innerHTML = `<div class="alert alert-warning">❌ Error: ${error.message}</div>`;
+                container.innerHTML = `<div class="alert alert-warning"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Error: ${error.message}</div>`;
                 btn.disabled = false;
-                btn.innerHTML = '<span>📨</span> Generate & Send Reports';
+                btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Generate & Send Reports';
             }
         }
     </script>

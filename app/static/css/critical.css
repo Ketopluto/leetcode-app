@@ -2,7 +2,7 @@
 /* Navigation Bar */
 .navbar {
   background-color: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   padding: 15px 30px;
   display: flex;
   justify-content: space-between;
@@ -59,7 +59,7 @@
 .navbar-link.admin:hover {
   background-color: #2563eb;
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
 /* Responsive navbar */
@@ -125,7 +125,7 @@ body {
   padding: 40px;
   background-color: #f8fafc;
   border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
 /* Spinner Styles - Multiple variations */
@@ -467,7 +467,7 @@ body {
   padding: 30px;
   background: #ffffff;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   opacity: 0;
   transform: translateY(20px);
   animation: fadeInUp 0.6s ease-out forwards;
@@ -484,24 +484,24 @@ body {
 /* Tips Section - Premium Card with Animated Border */
 .tips-section {
   position: relative;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  background: #ffffff;
   border-radius: 16px;
   padding: 20px 24px;
   margin: 24px 0 16px;
-  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   overflow: hidden;
 }
 
-.tips-section::before {
+.tips-section-hidden {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #3b82f6, #10b981, #f59e0b, #3b82f6);
+  background: #ffffff;
   background-size: 300% 100%;
-  animation: gradientSlide 3s ease-in-out infinite;
+  
 }
 
 @keyframes gradientSlide {
@@ -526,7 +526,7 @@ body {
 
 .tips-icon {
   font-size: 24px;
-  animation: bounce-glow 2s ease-in-out infinite;
+  
 }
 
 @keyframes bounce-glow {
@@ -534,12 +534,12 @@ body {
   0%,
   100% {
     transform: scale(1) rotate(0deg);
-    filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.5));
+    
   }
 
   50% {
     transform: scale(1.15) rotate(-5deg);
-    filter: drop-shadow(0 0 12px rgba(251, 191, 36, 0.8));
+    
   }
 }
 
@@ -549,10 +549,10 @@ body {
   color: #3b82f6;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  background: linear-gradient(135deg, #3b82f6 0%, #10b981 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  background: #ffffff;
+  
+  
+  
 }
 
 .tip-text {
@@ -589,10 +589,10 @@ body {
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: #ffffff;
   border-radius: 50px;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-  animation: float-badge 3s ease-in-out infinite;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  
 }
 
 @keyframes float-badge {

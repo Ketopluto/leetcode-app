@@ -207,6 +207,10 @@ function getRandomTip() {
 // Tip cycling interval reference
 let tipInterval = null;
 
+// Progress bar variables
+let progressInterval = null;
+let currentProgress = 0;
+
 // Show loading screen with random spinner
 function showLoading() {
   const loadingScreen = document.getElementById('loading-screen');
@@ -233,10 +237,23 @@ function showLoading() {
   }
 
   // Reset progress bar
-  progressBar.style.animation = 'none';
-  setTimeout(() => {
-    progressBar.style.animation = 'progress 3s ease-in-out forwards';
-  }, 10);
+  if (progressBar) {
+    progressBar.style.animation = 'none';
+    progressBar.style.width = '0%';
+    progressBar.style.transition = 'width 0.4s ease';
+    currentProgress = 0;
+    
+    if (progressInterval) clearInterval(progressInterval);
+    
+    // Simulate loading up to 90%
+    progressInterval = setInterval(() => {
+      if (currentProgress < 90) {
+        currentProgress += Math.random() * 15;
+        if (currentProgress > 90) currentProgress = 90;
+        progressBar.style.width = `${currentProgress}%`;
+      }
+    }, 300);
+  }
 
   document.getElementById('mainContent').style.display = 'none';
 }
@@ -244,18 +261,27 @@ function showLoading() {
 // Hide loading screen
 function hideLoading() {
   const loadingScreen = document.getElementById('loading-screen');
-  loadingScreen.classList.add('fade-out');
+  const progressBar = document.getElementById('progress-bar');
 
-  // Clear tip cycling interval
-  if (tipInterval) {
-    clearInterval(tipInterval);
-    tipInterval = null;
+  if (progressBar) {
+    if (progressInterval) clearInterval(progressInterval);
+    progressBar.style.width = '100%';
   }
 
   setTimeout(() => {
-    loadingScreen.style.display = 'none';
-    document.getElementById('mainContent').style.display = 'block';
-  }, 500);
+    loadingScreen.classList.add('fade-out');
+
+    // Clear tip cycling interval
+    if (tipInterval) {
+      clearInterval(tipInterval);
+      tipInterval = null;
+    }
+
+    setTimeout(() => {
+      loadingScreen.style.display = 'none';
+      document.getElementById('mainContent').style.display = 'block';
+    }, 500);
+  }, 400); // Wait for 100% width transition before fading out
 }
 
 // Build table from results
@@ -291,7 +317,7 @@ function buildTable(results) {
     // Show error indicator for invalid usernames
     let usernameDisplay = row.username;
     if (hasError && !isHigherStudies) {
-      usernameDisplay = `<span title="Error: ${row.fetch_error}" style="color: #e53e3e; cursor: help;">⚠️ ${row.username}</span>`;
+      usernameDisplay = `<span title="Error: ${row.fetch_error}" style="color: #e53e3e; cursor: help;"><svg class="icon inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> ${row.username}</span>`;
     }
 
     html += `<tr ${rowClass}>
@@ -316,7 +342,7 @@ function buildLeaderboard(results) {
   let html = '';
 
   top5.forEach((solver, index) => {
-    const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🏅';
+    const medal = `<span class="rank-badge rank-${index + 1}">#${index + 1}</span>`;
     const yearDisplay = solver.year_display || solver.year;
     html += `<li>
                <span>${medal} <strong>${solver.actual_name}</strong> (${solver.username}) - ${yearDisplay}</span>
@@ -340,7 +366,7 @@ function updateStatsOverview(results) {
 
   // Log error count for debugging
   if (errorCount > 0) {
-    console.warn(`⚠️ ${errorCount} users have invalid LeetCode profiles (showing 0 scores)`);
+    console.warn(`<svg class="icon inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> ${errorCount} users have invalid LeetCode profiles (showing 0 scores)`);
   }
 }
 
@@ -417,14 +443,17 @@ function updateLastRefreshTime() {
       refreshIndicator.id = 'refreshIndicator';
       refreshIndicator.className = 'stat-card';
       refreshIndicator.style.cssText = `
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        color: #1e293b;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         text-align: center;
         min-height: 120px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        border-radius: 12px;
       `;
       statsOverview.appendChild(refreshIndicator);
     }

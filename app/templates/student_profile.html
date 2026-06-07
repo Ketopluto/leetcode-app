@@ -367,12 +367,12 @@
   <!-- Navigation Bar -->
   <nav class="navbar">
     <a href="/" class="navbar-brand">
-      <span>📊</span>
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
       <span>LeetCode Stats</span>
     </a>
     <div class="navbar-links">
       <a href="/" class="navbar-link">
-        <span>←</span>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
         <span>Back to Dashboard</span>
       </a>
     </div>
@@ -384,21 +384,21 @@
       <h1>{{ student.name }}</h1>
       <div class="profile-info">
         <div class="info-item">
-          <span>🎓</span>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
           <span><strong>Year:</strong> {{ year_display }}{% if student.section %} (Section {{ student.section }}){%
             endif %}</span>
         </div>
         <div class="info-item">
-          <span>🔢</span>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
           <span><strong>Register No:</strong> {{ student.register_number }}</span>
         </div>
         <div class="info-item">
-          <span>💻</span>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           <span><strong>LeetCode:</strong> {{ stats.username }}</span>
         </div>
         {% if stats.ranking > 0 %}
         <div class="info-item">
-          <span>🏆</span>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v6a5 5 0 0 1-10 0V4z"/><path d="M7 8H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h3"/><path d="M17 8h3a2 2 0 0 0 2-2V5c0-1.1-.9-2-2-2h-3"/></svg>
           <span><strong>Global Rank:</strong> {{ "{:,}".format(stats.ranking) }}</span>
         </div>
         {% endif %}
@@ -406,7 +406,7 @@
 
       {% if stats.profile_url %}
       <a href="{{ stats.profile_url }}" target="_blank" class="external-link-btn">
-        <span>🔗</span>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         <span>View LeetCode Profile</span>
       </a>
       {% endif %}
@@ -415,7 +415,7 @@
     <!-- Stats Grid -->
     <div class="stats-grid">
       <div class="stat-card easy">
-        <div class="stat-icon">✅</div>
+        <div class="stat-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
         <div class="stat-value" id="easy-count">{{ stats.easySolved }}</div>
         <div class="stat-label">Easy Solved</div>
       </div>
@@ -433,7 +433,7 @@
       </div>
 
       <div class="stat-card total">
-        <div class="stat-icon">🎯</div>
+        <div class="stat-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
         <div class="stat-value" id="total-count">{{ stats.totalSolved }}</div>
         <div class="stat-label">Total Solved</div>
       </div>
@@ -455,7 +455,7 @@
         cursor: pointer;
         transition: all 0.3s ease;
       ">
-        <span>🔄</span>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         <span>Refresh My Stats</span>
       </button>
       <div id="refreshMessage" style="margin-top: 10px; font-size: 14px;"></div>
@@ -467,7 +467,7 @@
         const msg = document.getElementById('refreshMessage');
 
         btn.disabled = true;
-        btn.innerHTML = '<span>⏳</span><span>Refreshing...</span>';
+        btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Refreshing...</span>';
         btn.style.backgroundColor = '#6b7280';
         msg.innerHTML = '';
 
@@ -478,7 +478,7 @@
           const data = await response.json();
 
           if (data.success) {
-            msg.innerHTML = '<span style="color: #10b981;">✅ ' + data.message + '</span>';
+            msg.innerHTML = '<span style="color: #10b981;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> ' + data.message + '</span>';
             // Update the displayed counts
             if (data.stats) {
               document.getElementById('easy-count').textContent = data.stats.easy;
@@ -487,14 +487,14 @@
               document.getElementById('total-count').textContent = data.stats.total;
             }
           } else {
-            msg.innerHTML = '<span style="color: #ef4444;">❌ ' + data.message + '</span>';
+            msg.innerHTML = '<span style="color: #ef4444;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> ' + data.message + '</span>';
           }
         } catch (error) {
-          msg.innerHTML = '<span style="color: #ef4444;">❌ Error: ' + error.message + '</span>';
+          msg.innerHTML = '<span style="color: #ef4444;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Error: ' + error.message + '</span>';
         }
 
         btn.disabled = false;
-        btn.innerHTML = '<span>🔄</span><span>Refresh My Stats</span>';
+        btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg><span>Refresh My Stats</span>';
         btn.style.backgroundColor = '#10b981';
       }
     </script>
@@ -503,7 +503,7 @@
     {% if stats.totalSolved > 0 %}
     <div class="content-section">
       <h2 class="section-title">
-        <span>📊</span>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
         <span>Problem Distribution</span>
       </h2>
 
@@ -544,7 +544,7 @@
     <!-- Recent Submissions -->
     <div class="content-section">
       <h2 class="section-title">
-        <span>📝</span>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         <span>Recent Submissions</span>
       </h2>
 
@@ -564,7 +564,7 @@
       </div>
       {% else %}
       <div class="empty-state">
-        <div class="empty-state-icon">📭</div>
+        <div class="empty-state-icon"><svg class="icon empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg></div>
         <p>No recent submissions found</p>
       </div>
       {% endif %}
@@ -574,7 +574,7 @@
     {% if stats.contributionPoint > 0 or stats.reputation > 0 %}
     <div class="content-section">
       <h2 class="section-title">
-        <span>⭐</span>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         <span>Community Engagement</span>
       </h2>
 
@@ -589,7 +589,7 @@
 
         {% if stats.reputation > 0 %}
         <div class="stat-card">
-          <div class="stat-icon">⭐</div>
+          <div class="stat-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
           <div class="stat-value" style="color: #f59e0b;">{{ stats.reputation }}</div>
           <div class="stat-label">Reputation</div>
         </div>
