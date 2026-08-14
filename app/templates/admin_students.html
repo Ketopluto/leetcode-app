@@ -1,463 +1,92 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "_base.html" %}
+{% set active_nav = 'students' %}
+{% block title %}Students · LeetCode Stats{% endblock %}
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Manage Students - Admin Panel</title>
-  <link rel="icon" type="image/png" href="{{ url_for('assets.static', filename='favicon.png') }}">
-  <link rel="apple-touch-icon" href="{{ url_for('assets.static', filename='favicon.png') }}">
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background-color: #f8f9fa;
-      color: #2d3748;
-    }
-
-    .navbar {
-      background-color: #ffffff;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-      padding: 15px 30px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 30px;
-    }
-
-    .navbar-brand {
-      font-size: 20px;
-      font-weight: 700;
-      color: #1a202c;
-      text-decoration: none;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .navbar-links {
-      display: flex;
-      gap: 15px;
-      align-items: center;
-    }
-
-    .navbar-link {
-      color: #4a5568;
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 14px;
-      padding: 8px 16px;
-      border-radius: 8px;
-      transition: all 0.3s ease;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .navbar-link:hover {
-      background-color: #f7fafc;
-      color: #3b82f6;
-    }
-
-    .navbar-link.logout {
-      background-color: #ef4444;
-      color: #ffffff;
-    }
-
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 0 30px 40px;
-    }
-
-    .header {
-      background: #ffffff;
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-      margin-bottom: 30px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .header h1 {
-      font-size: 32px;
-      color: #1a202c;
-    }
-
-    .header-info {
-      text-align: right;
-    }
-
-    .total-count {
-      font-size: 14px;
-      color: #718096;
-      margin-bottom: 5px;
-    }
-
-    .showing-count {
-      font-size: 18px;
-      font-weight: 600;
-      color: #3b82f6;
-    }
-
-    .filters {
-      background: #ffffff;
-      padding: 25px;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-      margin-bottom: 30px;
-    }
-
-    .filters form {
-      display: grid;
-      grid-template-columns: 2fr 1fr 1fr auto;
-      gap: 15px;
-      align-items: end;
-    }
-
-    .filter-group {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .filter-group label {
-      font-weight: 600;
-      color: #4a5568;
-      font-size: 14px;
-    }
-
-    .filter-input {
-      padding: 10px 14px;
-      border: 2px solid #cbd5e0;
-      border-radius: 8px;
-      font-size: 14px;
-      transition: all 0.3s ease;
-    }
-
-    .filter-input:focus {
-      outline: none;
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    }
-
-    .filter-btn {
-      padding: 10px 20px;
-      background-color: #3b82f6;
-      color: #ffffff;
-      border: none;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-    }
-
-    .filter-btn:hover {
-      background-color: #2563eb;
-    }
-
-    .students-table {
-      background: #ffffff;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-      overflow: hidden;
-      margin-bottom: 30px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    table th {
-      background-color: #f7fafc;
-      padding: 16px;
-      text-align: left;
-      font-weight: 600;
-      color: #4a5568;
-      border-bottom: 2px solid #e2e8f0;
-      font-size: 14px;
-    }
-
-    table td {
-      padding: 16px;
-      border-bottom: 1px solid #e2e8f0;
-      color: #2d3748;
-    }
-
-    table tr:hover {
-      background-color: #f7fafc;
-    }
-
-    .actions {
-      display: flex;
-      gap: 10px;
-    }
-
-    .btn {
-      padding: 6px 14px;
-      border-radius: 6px;
-      text-decoration: none;
-      font-size: 13px;
-      font-weight: 600;
-      transition: all 0.3s ease;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    .btn-edit {
-      background-color: #3b82f6;
-      color: #ffffff;
-    }
-
-    .btn-edit:hover {
-      background-color: #2563eb;
-    }
-
-    .btn-delete {
-      background-color: #ef4444;
-      color: #ffffff;
-      border: none;
-      cursor: pointer;
-    }
-
-    .btn-delete:hover {
-      background-color: #dc2626;
-    }
-
-    .badge {
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .badge-year {
-      background-color: #dbeafe;
-      color: #1e40af;
-    }
-
-    .badge-section {
-      background-color: #fef3c7;
-      color: #92400e;
-    }
-
-    /* Pagination Styles */
-    .pagination {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 10px;
-      padding: 20px;
-      background: #ffffff;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    }
-
-    .pagination-info {
-      color: #718096;
-      font-size: 14px;
-      margin-right: 20px;
-    }
-
-    .pagination-btn {
-      padding: 8px 14px;
-      border-radius: 6px;
-      text-decoration: none;
-      font-size: 14px;
-      font-weight: 600;
-      transition: all 0.3s ease;
-      border: 1px solid #cbd5e0;
-      color: #2d3748;
-    }
-
-    .pagination-btn:hover:not(.disabled) {
-      background-color: #3b82f6;
-      color: #ffffff;
-      border-color: #3b82f6;
-    }
-
-    .pagination-btn.active {
-      background-color: #3b82f6;
-      color: #ffffff;
-      border-color: #3b82f6;
-    }
-
-    .pagination-btn.disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .alert {
-      padding: 14px 18px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      font-size: 14px;
-    }
-
-    .alert-success {
-      background-color: #d1fae5;
-      color: #065f46;
-    }
-
-    .alert-error {
-      background-color: #fee2e2;
-      color: #991b1b;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: #718096;
-    }
-
-    .empty-state-icon {
-      font-size: 64px;
-      margin-bottom: 20px;
-    }
-
-    @media (max-width: 1024px) {
-      .filters form {
-        grid-template-columns: 1fr;
-      }
-
-      .header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 15px;
-      }
-    }
-  </style>
-  <script>
-    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-  </script>
-  <script defer src="/_vercel/insights/script.js"></script>
-</head>
-
-<body>
-  <nav class="navbar">
-    <a href="/" class="navbar-brand">
-      <span>📊</span>
-      <span>LeetCode Stats</span>
-    </a>
-    <div class="navbar-links">
-      <a href="/admin" class="navbar-link">
-        <span>📤</span>
-        <span>Upload</span>
-      </a>
-      <a href="/admin/students" class="navbar-link">
-        <span>👥</span>
-        <span>Manage Students</span>
-      </a>
-      <a href="{{ url_for('admin_logout') }}" class="navbar-link logout">
-        <span>🚪</span>
-        <span>Logout</span>
-      </a>
+{% block body %}
+<div class="admin-container">
+  <div class="page-head page-head-row">
+    <div>
+      <h1 class="page-title">Students</h1>
+      <p class="page-subtitle">{{ pagination.total }} on the roster</p>
     </div>
-  </nav>
+    <a href="/admin" class="btn btn-secondary">{{ ui.icon('upload', 15) }} Upload roster</a>
+  </div>
 
-  <div class="container">
-    <div class="header">
-      <div>
-        <h1>👥 Manage Students</h1>
+  <div class="card card-pad section">
+    <form method="GET" action="{{ url_for('admin_students') }}" class="filters-form">
+      <div class="field">
+        <label class="label" for="search">Search</label>
+        <div class="input-with-icon">
+          {{ ui.icon('search', 16) }}
+          <input type="text" id="search" name="search" value="{{ search }}" class="input"
+            placeholder="Name, register number or username">
+        </div>
       </div>
-      <div class="header-info">
-        <div class="total-count">Total Students</div>
-        <div class="showing-count">{{ pagination.total }}</div>
+
+      <div class="field">
+        <label class="label" for="year">Year</label>
+        <select id="year" name="year" class="select">
+          <option value="">All years</option>
+          {% for y in years %}
+          <option value="{{ y }}" {% if year_filter==y|string %}selected{% endif %}>Year {{ y }}</option>
+          {% endfor %}
+        </select>
       </div>
-    </div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-    {% for category, message in messages %}
-    <div class="alert alert-{{ category }}">
-      {{ message }}
-    </div>
-    {% endfor %}
-    {% endif %}
-    {% endwith %}
+      <div class="field">
+        <label class="label" for="section">Section</label>
+        <select id="section" name="section" class="select">
+          <option value="">All sections</option>
+          {% for s in sections %}
+          <option value="{{ s }}" {% if section_filter==s %}selected{% endif %}>Section {{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
 
-    <div class="filters">
-      <form method="GET" action="{{ url_for('admin_students') }}">
-        <div class="filter-group">
-          <label for="search">🔍 Search</label>
-          <input type="text" id="search" name="search" value="{{ search }}"
-            placeholder="Search by name, register no, or username" class="filter-input">
-        </div>
+      <button type="submit" class="btn btn-primary">Filter</button>
+    </form>
+  </div>
 
-        <div class="filter-group">
-          <label for="year">Year</label>
-          <select id="year" name="year" class="filter-input">
-            <option value="">All Years</option>
-            {% for y in years %}
-            <option value="{{ y }}" {% if year_filter==y|string %}selected{% endif %}>Year {{ y }}</option>
-            {% endfor %}
-          </select>
-        </div>
-
-        <div class="filter-group">
-          <label for="section">Section</label>
-          <select id="section" name="section" class="filter-input">
-            <option value="">All Sections</option>
-            {% for s in sections %}
-            <option value="{{ s }}" {% if section_filter==s %}selected{% endif %}>Section {{ s }}</option>
-            {% endfor %}
-          </select>
-        </div>
-
-        <button type="submit" class="filter-btn">Apply</button>
-      </form>
-    </div>
-
-    <div class="students-table">
-      {% if students %}
+  <div class="card">
+    {% if students %}
+    <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Register No</th>
+            <th>Register no.</th>
             <th>Name</th>
-            <th>LeetCode Username</th>
+            <th>Username</th>
             <th>Year</th>
             <th>Section</th>
-            <th>Last Updated</th>
-            <th>Actions</th>
+            <th>Updated</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           {% for student in students %}
           <tr>
-            <td><strong>{{ student.register_number }}</strong></td>
-            <td>{{ student.name }}</td>
-            <td><code>{{ student.leetcode_username }}</code></td>
-            <td><span class="badge badge-year">Year {{ student.year }}</span></td>
+            <td class="cell-mono">{{ student.register_number }}</td>
+            <td class="strong">{{ student.name }}</td>
+            <td class="cell-mono">{{ student.leetcode_username }}</td>
+            <td><span class="badge badge-neutral">Year {{ student.year }}</span></td>
             <td>
               {% if student.section %}
-              <span class="badge badge-section">{{ student.section }}</span>
+              <span class="badge badge-accent">{{ student.section }}</span>
               {% else %}
-              <span style="color: #9ca3af;">—</span>
+              <span class="subtle">—</span>
               {% endif %}
             </td>
-            <td style="font-size: 13px; color: #718096;">
-              {{ student.updated_at.strftime('%Y-%m-%d %H:%M') if student.updated_at else
-              student.created_at.strftime('%Y-%m-%d %H:%M') }}
+            <td class="subtle text-xs">
+              {{ (student.updated_at or student.created_at).strftime('%d %b %Y, %H:%M') }}
             </td>
             <td>
-              <div class="actions">
-                <a href="{{ url_for('admin_edit_student', student_id=student.id) }}" class="btn btn-edit">
-                  <span>✏️</span>
-                  <span>Edit</span>
+              <div class="row" style="gap:6px;justify-content:flex-end">
+                <a href="{{ url_for('admin_edit_student', student_id=student.id) }}" class="btn btn-secondary btn-sm">
+                  {{ ui.icon('edit', 14) }} Edit
                 </a>
-                <button onclick="deleteStudent({{ student.id }}, '{{ student.name }}')" class="btn btn-delete">
-                  <span>🗑️</span>
-                  <span>Delete</span>
+                <button type="button" class="btn btn-danger btn-sm" data-delete-id="{{ student.id }}"
+                  data-name="{{ student.name }}">
+                  {{ ui.icon('trash', 14) }}
                 </button>
               </div>
             </td>
@@ -465,84 +94,85 @@
           {% endfor %}
         </tbody>
       </table>
-      {% else %}
-      <div class="empty-state">
-        <div class="empty-state-icon">📭</div>
-        <h3>No students found</h3>
-        <p>Try adjusting your filters or upload student data</p>
-      </div>
-      {% endif %}
     </div>
-
-    <!-- Pagination -->
-    {% if pagination.pages > 1 %}
-    <div class="pagination">
-      <span class="pagination-info">
-        Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }} -
-        {{ min(pagination.page * pagination.per_page, pagination.total) }} of {{ pagination.total }}
-      </span>
-
-      {% if pagination.has_prev %}
-      <a href="{{ url_for('admin_students', page=pagination.prev_num, search=search, year=year_filter, section=section_filter) }}"
-        class="pagination-btn">← Previous</a>
-      {% else %}
-      <span class="pagination-btn disabled">← Previous</span>
-      {% endif %}
-
-      {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
-      {% if page_num %}
-      {% if page_num == pagination.page %}
-      <span class="pagination-btn active">{{ page_num }}</span>
-      {% else %}
-      <a href="{{ url_for('admin_students', page=page_num, search=search, year=year_filter, section=section_filter) }}"
-        class="pagination-btn">{{ page_num }}</a>
-      {% endif %}
-      {% else %}
-      <span class="pagination-btn disabled">...</span>
-      {% endif %}
-      {% endfor %}
-
-      {% if pagination.has_next %}
-      <a href="{{ url_for('admin_students', page=pagination.next_num, search=search, year=year_filter, section=section_filter) }}"
-        class="pagination-btn">Next →</a>
-      {% else %}
-      <span class="pagination-btn disabled">Next →</span>
-      {% endif %}
+    {% else %}
+    <div class="empty">
+      {{ ui.icon('users', 30) }}
+      <div class="empty-title">No students found</div>
+      <div class="empty-text">Adjust the filters, or upload a roster to get started.</div>
     </div>
     {% endif %}
   </div>
 
-  <script>
-    async function deleteStudent(studentId, studentName) {
-      if (!confirm(`Are you sure you want to delete ${studentName}?\n\nThis action cannot be undone.`)) {
-        return;
-      }
+  {% if pagination.pages > 1 %}
+  <div class="pagination">
+    <span class="page-info">
+      {{ ((pagination.page - 1) * pagination.per_page) + 1 }}–{{ min(pagination.page * pagination.per_page,
+      pagination.total) }} of {{ pagination.total }}
+    </span>
 
+    {% if pagination.has_prev %}
+    <a href="{{ url_for('admin_students', page=pagination.prev_num, search=search, year=year_filter, section=section_filter) }}"
+      class="page-btn">{{ ui.icon('chevron-left', 14) }}</a>
+    {% else %}
+    <span class="page-btn is-disabled">{{ ui.icon('chevron-left', 14) }}</span>
+    {% endif %}
+
+    {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+    {% if page_num %}
+    {% if page_num == pagination.page %}
+    <span class="page-btn is-active">{{ page_num }}</span>
+    {% else %}
+    <a href="{{ url_for('admin_students', page=page_num, search=search, year=year_filter, section=section_filter) }}"
+      class="page-btn">{{ page_num }}</a>
+    {% endif %}
+    {% else %}
+    <span class="page-btn is-disabled">…</span>
+    {% endif %}
+    {% endfor %}
+
+    {% if pagination.has_next %}
+    <a href="{{ url_for('admin_students', page=pagination.next_num, search=search, year=year_filter, section=section_filter) }}"
+      class="page-btn">{{ ui.icon('chevron-right', 14) }}</a>
+    {% else %}
+    <span class="page-btn is-disabled">{{ ui.icon('chevron-right', 14) }}</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('[data-delete-id]').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      const id = btn.dataset.deleteId;
+      const name = btn.dataset.name;
+
+      if (!confirm('Delete ' + name + '?\n\nThis cannot be undone.')) return;
+
+      btn.disabled = true;
       try {
-        const response = await fetch(`/admin/student/delete/${studentId}`, {
+        const res = await fetch('/admin/student/delete/' + encodeURIComponent(id), {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
           }
         });
-
-        const data = await response.json();
+        const data = await res.json();
 
         if (data.success) {
-          alert(data.message);
-          window.location.reload();
+          btn.closest('tr').remove();
         } else {
-          alert('Error: ' + data.message);
+          alert(data.message);
+          btn.disabled = false;
         }
-      } catch (error) {
-        alert('Error deleting student: ' + error.message);
+      } catch (err) {
+        alert('Could not delete: ' + err.message);
+        btn.disabled = false;
       }
-    }
-  </script>
-  <script>
-    window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
-  </script>
-  <script defer src="/_vercel/speed-insights/script.js"></script>
-</body>
-
-</html>
+    });
+  });
+</script>
+{% endblock %}

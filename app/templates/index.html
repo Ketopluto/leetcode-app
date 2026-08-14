@@ -1,154 +1,120 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "_base.html" %}
+{% set active_nav = 'dashboard' %}
+{% block title %}Dashboard · LeetCode Stats{% endblock %}
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LeetCode Statistics Dashboard</title>
-  <link rel="icon" type="image/png" href="{{ url_for('assets.static', filename='favicon.png') }}">
-  <link rel="apple-touch-icon" href="{{ url_for('assets.static', filename='favicon.png') }}">
-  <link rel="stylesheet" href="static/css/critical.css">
-  <link rel="preload" href="static/css/non-critical.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript>
-    <link rel="stylesheet" href="static/css/non-critical.css">
-  </noscript>
-  <script>
-    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-  </script>
-  <script defer src="/_vercel/insights/script.js"></script>
-</head>
-
-<body>
-  <!-- Navigation Bar -->
-  <nav class="navbar">
-    <a href="/" class="navbar-brand">
-      <span>📊</span>
-      <span>LeetCode Stats</span>
-    </a>
-    <div class="navbar-links">
-      <a href="/" class="navbar-link">
-        <span>🏠</span>
-        <span>Dashboard</span>
-      </a>
-      <a href="/admin/login" class="navbar-link admin">
-        <span>🔐</span>
-        <span>Admin</span>
-      </a>
+{% block body %}
+<div class="container">
+  <div class="page-head page-head-row">
+    <div>
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-subtitle">Problem-solving activity across the cohort.</p>
     </div>
-  </nav>
-
-  <!-- Loading Screen -->
-  <div id="loading-screen">
-    <div class="loader-container">
-      <div id="spinner-container"></div>
-      <p class="loading-text" id="loading-text">Fetching LeetCode Stats</p>
-      <p class="loading-subtext" id="loading-subtext">Hang tight! This won't take long...</p>
-      <div class="progress-bar-container">
-        <div class="progress-bar" id="progress-bar"></div>
-      </div>
-
-      <!-- Pro Tips Section -->
-      <div class="tips-section">
-        <div class="tips-header">
-          <span class="tips-icon">💡</span>
-          <span class="tips-title">Pro Tip</span>
-        </div>
-        <p class="tip-text" id="tip-text">Loading tip...</p>
-      </div>
-
-      <!-- Motivational Footer -->
-      <div class="motivational-footer">
-        <span class="code-badge">
-          <span class="badge-icon">🎯</span>
-          <span class="badge-text">Keep grinding!</span>
-        </span>
-      </div>
+    <div class="row text-xs subtle">
+      <span class="dot dot-success"></span>
+      <span id="refreshStamp">Loading…</span>
     </div>
   </div>
 
-  <!-- Main Content -->
-  <div class="container" id="mainContent">
-    <div class="header-section">
-      <h1 class="main-title">
-        <span class="emoji">📊</span> LeetCode Statistics Dashboard <span class="emoji">🚀</span>
-      </h1>
-      <p class="subtitle">Track your coding progress and compete with peers</p>
+  <div class="metrics rise">
+    <div class="metric">
+      <div class="metric-label">{{ ui.icon('users', 14) }} Students</div>
+      <div class="metric-value" id="mStudents">—</div>
+      <div class="metric-meta" id="mStudentsMeta">&nbsp;</div>
     </div>
+    <div class="metric">
+      <div class="metric-label">{{ ui.icon('check-circle', 14) }} Problems solved</div>
+      <div class="metric-value" id="mSolved">—</div>
+      <div class="metric-meta">across all students</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">{{ ui.icon('bar-chart', 14) }} Average</div>
+      <div class="metric-value" id="mAvg">—</div>
+      <div class="metric-meta">per student</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">{{ ui.icon('check-circle', 14) }} Top score</div>
+      <div class="metric-value" id="mTop">—</div>
+      <div class="metric-meta" id="mTopMeta">&nbsp;</div>
+    </div>
+  </div>
 
-    <!-- Year Selection -->
-    <div class="year-select">
-      <form id="yearForm" class="filter-form">
-        <label for="year" class="filter-label">
-          <span class="filter-icon">🎓</span> Filter by Year:
-        </label>
-        <div class="select-wrapper">
-          <select name="year" id="year" class="year-dropdown">
-            <option value="">All Years</option>
-            {% for year in available_years %}
-            <option value="{{ year }}">{{ year }}</option>
-            {% endfor %}
-          </select>
+  <div class="dash-grid">
+    <div>
+      <form id="filterForm" class="toolbar">
+        <div class="input-with-icon">
+          {{ ui.icon('search', 16) }}
+          <input type="text" id="tableSearch" class="input" placeholder="Search name, roll number or username"
+            autocomplete="off">
         </div>
-        <button type="submit" class="apply-btn">Apply Filter</button>
+        <select name="year" id="year" class="select">
+          <option value="">All years</option>
+          {% for year in available_years %}
+          <option value="{{ year }}">{{ year }}</option>
+          {% endfor %}
+        </select>
+        <a class="btn btn-secondary" id="downloadLink" href="/download">
+          {{ ui.icon('download', 15) }} Export CSV
+        </a>
       </form>
+
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">All students</span>
+          <span class="card-note" id="rowCount"></span>
+        </div>
+        <div class="table-wrap" id="tableContainer">
+          <table>
+            <thead>
+              <tr>
+                <th>Roll no.</th>
+                <th>Name</th>
+                <th>Username</th>
+                <th>Year</th>
+                <th class="num">Easy</th>
+                <th class="num">Med</th>
+                <th class="num">Hard</th>
+                <th class="num">Total</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              {% for _ in range(8) %}
+              <tr>
+                <td colspan="8" style="padding:0">
+                  <div class="skeleton skeleton-row"></div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="table-foot">
+          <span id="tableFootNote">Fetching latest stats…</span>
+          <span class="subtle">Auto-refreshes every 2 minutes</span>
+        </div>
+      </div>
     </div>
 
-    <!-- Leaderboard Section -->
-    <div class="leaderboard" id="leaderboard">
-      <div class="section-header">
-        <h2 class="section-title">
-          <span class="trophy">🏆</span> Top 5 Problem Solvers
-        </h2>
+    <aside class="card">
+      <div class="card-head">
+        <span class="card-title">Leaderboard</span>
+        <span class="card-note">Top 5</span>
       </div>
-      <ul id="leaderboardList" class="leaderboard-list">
-        <!-- Leaderboard data will be inserted here -->
+      <ul class="rank-list" id="rankList">
+        {% for _ in range(5) %}
+        <li class="rank-item">
+          <div class="skeleton" style="width:22px;height:22px;border-radius:999px"></div>
+          <div class="rank-body">
+            <div class="skeleton skeleton-text" style="width:70%;margin-bottom:6px"></div>
+            <div class="skeleton skeleton-text" style="width:45%;height:9px"></div>
+          </div>
+        </li>
+        {% endfor %}
       </ul>
-    </div>
-
-    <!-- Stats Overview Cards -->
-    <div class="stats-overview" id="statsOverview">
-      <div class="stat-card">
-        <div class="stat-icon">👥</div>
-        <div class="stat-value" id="totalUsers">0</div>
-        <div class="stat-label">Total Users</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">✅</div>
-        <div class="stat-value" id="totalProblems">0</div>
-        <div class="stat-label">Problems Solved</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">📈</div>
-        <div class="stat-value" id="avgProblems">0</div>
-        <div class="stat-label">Average per User</div>
-      </div>
-    </div>
-
-    <!-- Table Container -->
-    <div class="table-section">
-      <div class="section-header">
-        <h2 class="section-title">
-          <span class="table-icon">📋</span> Detailed Statistics
-        </h2>
-      </div>
-      <div class="table-wrapper" id="tableContainer">
-        <!-- Table will be injected here -->
-      </div>
-    </div>
-
-    <!-- Download Button -->
-    <div class="download-section">
-      <a class="download-btn" id="downloadLink" href="#">
-        <span class="download-icon">⬇️</span> Download CSV Report
-      </a>
-    </div>
+    </aside>
   </div>
+</div>
+{% endblock %}
 
-  <script src="static/js/main.js"></script>
-  <script>
-    window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
-  </script>
-  <script defer src="/_vercel/speed-insights/script.js"></script>
-</body>
-
-</html>
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}

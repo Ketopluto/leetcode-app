@@ -1,611 +1,187 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "_base.html" %}
+{% block title %}{{ student.name }} · LeetCode Stats{% endblock %}
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ student.name }} - LeetCode Profile</title>
-  <link rel="icon" type="image/png" href="{{ url_for('assets.static', filename='favicon.png') }}">
-  <link rel="apple-touch-icon" href="{{ url_for('assets.static', filename='favicon.png') }}">
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+{% block body %}
+<div class="container">
+  <a href="/" class="btn btn-ghost btn-sm" style="margin-bottom:16px">
+    {{ ui.icon('arrow-left', 15) }} Dashboard
+  </a>
 
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background-color: #f8f9fa;
-      color: #2d3748;
-      line-height: 1.6;
-    }
-
-    /* Navigation Bar */
-    .navbar {
-      background-color: #ffffff;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-      padding: 15px 30px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 40px;
-    }
-
-    .navbar-brand {
-      font-size: 20px;
-      font-weight: 700;
-      color: #1a202c;
-      text-decoration: none;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .navbar-brand:hover {
-      color: #3b82f6;
-    }
-
-    .navbar-links {
-      display: flex;
-      gap: 15px;
-      align-items: center;
-    }
-
-    .navbar-link {
-      color: #4a5568;
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 14px;
-      padding: 8px 16px;
-      border-radius: 8px;
-      transition: all 0.3s ease;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .navbar-link:hover {
-      background-color: #f7fafc;
-      color: #3b82f6;
-    }
-
-    /* Main Container */
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 30px 40px;
-    }
-
-    /* Profile Header */
-    .profile-header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #ffffff;
-      padding: 40px;
-      border-radius: 12px;
-      margin-bottom: 30px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    }
-
-    .profile-header h1 {
-      font-size: 36px;
-      margin-bottom: 10px;
-    }
-
-    .profile-info {
-      display: flex;
-      gap: 30px;
-      flex-wrap: wrap;
-      margin-top: 20px;
-    }
-
-    .info-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 16px;
-    }
-
-    .info-item span {
-      opacity: 0.9;
-    }
-
-    /* Stats Grid */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 20px;
-      margin-bottom: 30px;
-    }
-
-    .stat-card {
-      background: #ffffff;
-      padding: 24px;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-      text-align: center;
-      transition: all 0.3s ease;
-    }
-
-    .stat-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-    }
-
-    .stat-card.easy {
-      border-left: 4px solid #10b981;
-    }
-
-    .stat-card.medium {
-      border-left: 4px solid #f59e0b;
-    }
-
-    .stat-card.hard {
-      border-left: 4px solid #ef4444;
-    }
-
-    .stat-card.total {
-      border-left: 4px solid #3b82f6;
-    }
-
-    .stat-icon {
-      font-size: 40px;
-      margin-bottom: 10px;
-    }
-
-    .stat-value {
-      font-size: 48px;
-      font-weight: 700;
-      margin-bottom: 5px;
-    }
-
-    .stat-card.easy .stat-value {
-      color: #10b981;
-    }
-
-    .stat-card.medium .stat-value {
-      color: #f59e0b;
-    }
-
-    .stat-card.hard .stat-value {
-      color: #ef4444;
-    }
-
-    .stat-card.total .stat-value {
-      color: #3b82f6;
-    }
-
-    .stat-label {
-      font-size: 14px;
-      color: #718096;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    /* Content Sections */
-    .content-section {
-      background: #ffffff;
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-      margin-bottom: 30px;
-    }
-
-    .section-title {
-      font-size: 24px;
-      font-weight: 700;
-      color: #1a202c;
-      margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    /* Recent Submissions */
-    .submissions-list {
-      display: grid;
-      gap: 12px;
-    }
-
-    .submission-item {
-      padding: 16px;
-      background: #f7fafc;
-      border-radius: 8px;
-      border-left: 4px solid #3b82f6;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      transition: all 0.3s ease;
-    }
-
-    .submission-item:hover {
-      background: #eff6ff;
-      transform: translateX(5px);
-    }
-
-    .submission-title {
-      font-weight: 600;
-      color: #1a202c;
-      margin-bottom: 4px;
-    }
-
-    .submission-meta {
-      font-size: 12px;
-      color: #718096;
-    }
-
-    .submission-status {
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .status-accepted {
-      background-color: #d1fae5;
-      color: #065f46;
-    }
-
-    .difficulty-easy {
-      border-left-color: #10b981;
-    }
-
-    .difficulty-medium {
-      border-left-color: #f59e0b;
-    }
-
-    .difficulty-hard {
-      border-left-color: #ef4444;
-    }
-
-    /* Progress Bars */
-    .progress-section {
-      margin-top: 30px;
-    }
-
-    .progress-item {
-      margin-bottom: 20px;
-    }
-
-    .progress-label {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 8px;
-      font-weight: 600;
-    }
-
-    .progress-bar-container {
-      height: 12px;
-      background-color: #e2e8f0;
-      border-radius: 6px;
-      overflow: hidden;
-    }
-
-    .progress-bar {
-      height: 100%;
-      border-radius: 6px;
-      transition: width 1s ease-out;
-    }
-
-    .progress-bar.easy {
-      background-color: #10b981;
-    }
-
-    .progress-bar.medium {
-      background-color: #f59e0b;
-    }
-
-    .progress-bar.hard {
-      background-color: #ef4444;
-    }
-
-    /* External Link Button */
-    .external-link-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 24px;
-      background-color: #3b82f6;
-      color: #ffffff;
-      text-decoration: none;
-      border-radius: 8px;
-      font-weight: 600;
-      transition: all 0.3s ease;
-      margin-top: 20px;
-    }
-
-    .external-link-btn:hover {
-      background-color: #2563eb;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-    }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-      .navbar {
-        padding: 12px 20px;
-      }
-
-      .container {
-        padding: 0 20px 40px;
-      }
-
-      .profile-header {
-        padding: 30px 20px;
-      }
-
-      .profile-header h1 {
-        font-size: 28px;
-      }
-
-      .stats-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .submission-item {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-      }
-    }
-
-    /* Empty State */
-    .empty-state {
-      text-align: center;
-      padding: 40px;
-      color: #718096;
-    }
-
-    .empty-state-icon {
-      font-size: 64px;
-      margin-bottom: 20px;
-    }
-  </style>
-  <script>
-    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-  </script>
-  <script defer src="/_vercel/insights/script.js"></script>
-</head>
-
-<body>
-  <!-- Navigation Bar -->
-  <nav class="navbar">
-    <a href="/" class="navbar-brand">
-      <span>📊</span>
-      <span>LeetCode Stats</span>
-    </a>
-    <div class="navbar-links">
-      <a href="/" class="navbar-link">
-        <span>←</span>
-        <span>Back to Dashboard</span>
-      </a>
-    </div>
-  </nav>
-
-  <div class="container">
-    <!-- Profile Header -->
-    <div class="profile-header">
-      <h1>{{ student.name }}</h1>
-      <div class="profile-info">
-        <div class="info-item">
-          <span>🎓</span>
-          <span><strong>Year:</strong> {{ year_display }}{% if student.section %} (Section {{ student.section }}){%
-            endif %}</span>
-        </div>
-        <div class="info-item">
-          <span>🔢</span>
-          <span><strong>Register No:</strong> {{ student.register_number }}</span>
-        </div>
-        <div class="info-item">
-          <span>💻</span>
-          <span><strong>LeetCode:</strong> {{ stats.username }}</span>
-        </div>
-        {% if stats.ranking > 0 %}
-        <div class="info-item">
-          <span>🏆</span>
-          <span><strong>Global Rank:</strong> {{ "{:,}".format(stats.ranking) }}</span>
-        </div>
+  <div class="card profile-head rise">
+    <div class="avatar">{{ student.name[:1] | upper }}</div>
+    <div class="profile-id">
+      <h1 class="profile-name">{{ student.name }}</h1>
+      <div class="profile-meta">
+        <span><b>{{ year_display }}</b>{% if student.section %} · Section {{ student.section }}{% endif %}</span>
+        <span>Roll <b>{{ student.register_number }}</b></span>
+        <span>@<b>{{ stats.username }}</b></span>
+        {% if stats.ranking and stats.ranking > 0 %}
+        <span>Rank <b>{{ "{:,}".format(stats.ranking) }}</b></span>
         {% endif %}
       </div>
-
-      {% if stats.profile_url %}
-      <a href="{{ stats.profile_url }}" target="_blank" class="external-link-btn">
-        <span>🔗</span>
-        <span>View LeetCode Profile</span>
-      </a>
-      {% endif %}
     </div>
-
-    <!-- Stats Grid -->
-    <div class="stats-grid">
-      <div class="stat-card easy">
-        <div class="stat-icon">✅</div>
-        <div class="stat-value" id="easy-count">{{ stats.easySolved }}</div>
-        <div class="stat-label">Easy Solved</div>
-      </div>
-
-      <div class="stat-card medium">
-        <div class="stat-icon">⚡</div>
-        <div class="stat-value" id="medium-count">{{ stats.mediumSolved }}</div>
-        <div class="stat-label">Medium Solved</div>
-      </div>
-
-      <div class="stat-card hard">
-        <div class="stat-icon">🔥</div>
-        <div class="stat-value" id="hard-count">{{ stats.hardSolved }}</div>
-        <div class="stat-label">Hard Solved</div>
-      </div>
-
-      <div class="stat-card total">
-        <div class="stat-icon">🎯</div>
-        <div class="stat-value" id="total-count">{{ stats.totalSolved }}</div>
-        <div class="stat-label">Total Solved</div>
-      </div>
-    </div>
-
-    <!-- Quick Refresh Button -->
-    <div style="text-align: center; margin-bottom: 30px;">
-      <button id="refreshBtn" onclick="refreshMyStats()" style="
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 12px 24px;
-        background-color: #10b981;
-        color: #ffffff;
-        border: none;
-        border-radius: 8px;
-        font-weight: 600;
-        font-size: 14px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-      ">
-        <span>🔄</span>
-        <span>Refresh My Stats</span>
+    <div class="profile-actions">
+      <button id="refreshBtn" class="btn btn-secondary" type="button">
+        {{ ui.icon('refresh', 15) }} <span data-label>Refresh</span>
       </button>
-      <div id="refreshMessage" style="margin-top: 10px; font-size: 14px;"></div>
+      {% if stats.profile_url %}
+      <a href="{{ stats.profile_url }}" target="_blank" rel="noopener" class="btn btn-primary">
+        {{ ui.icon('external-link', 15) }} LeetCode
+      </a>
+      {% endif %}
     </div>
+  </div>
 
-    <script>
-      async function refreshMyStats() {
-        const btn = document.getElementById('refreshBtn');
-        const msg = document.getElementById('refreshMessage');
+  <p class="refresh-note muted" id="refreshMessage" style="margin:-8px 0 16px"></p>
 
-        btn.disabled = true;
-        btn.innerHTML = '<span>⏳</span><span>Refreshing...</span>';
-        btn.style.backgroundColor = '#6b7280';
-        msg.innerHTML = '';
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">Easy</div>
+      <div class="metric-value c-easy" id="easy-count">{{ stats.easySolved }}</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Medium</div>
+      <div class="metric-value c-medium" id="medium-count">{{ stats.mediumSolved }}</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Hard</div>
+      <div class="metric-value c-hard" id="hard-count">{{ stats.hardSolved }}</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Total solved</div>
+      <div class="metric-value" id="total-count">{{ stats.totalSolved }}</div>
+      {% if stats.acceptance_rate and stats.acceptance_rate > 0 %}
+      <div class="metric-meta">{{ stats.acceptance_rate }}% acceptance</div>
+      {% endif %}
+    </div>
+  </div>
 
-        try {
-          const response = await fetch('/api/refresh-student/{{ student.register_number }}', {
-            method: 'POST'
-          });
-          const data = await response.json();
-
-          if (data.success) {
-            msg.innerHTML = '<span style="color: #10b981;">✅ ' + data.message + '</span>';
-            // Update the displayed counts
-            if (data.stats) {
-              document.getElementById('easy-count').textContent = data.stats.easy;
-              document.getElementById('medium-count').textContent = data.stats.medium;
-              document.getElementById('hard-count').textContent = data.stats.hard;
-              document.getElementById('total-count').textContent = data.stats.total;
-            }
-          } else {
-            msg.innerHTML = '<span style="color: #ef4444;">❌ ' + data.message + '</span>';
-          }
-        } catch (error) {
-          msg.innerHTML = '<span style="color: #ef4444;">❌ Error: ' + error.message + '</span>';
-        }
-
-        btn.disabled = false;
-        btn.innerHTML = '<span>🔄</span><span>Refresh My Stats</span>';
-        btn.style.backgroundColor = '#10b981';
-      }
-    </script>
-
-    <!-- Progress Bars -->
-    {% if stats.totalSolved > 0 %}
-    <div class="content-section">
-      <h2 class="section-title">
-        <span>📊</span>
-        <span>Problem Distribution</span>
-      </h2>
-
-      <div class="progress-section">
-        <div class="progress-item">
-          <div class="progress-label">
-            <span>Easy Problems</span>
-            <span>{{ stats.easySolved }} / ~800</span>
-          </div>
-          <div class="progress-bar-container">
-            <div class="progress-bar easy" style="width: {{ (stats.easySolved / 800 * 100) | round }}%"></div>
-          </div>
+  {% if stats.totalSolved > 0 %}
+  <div class="card section">
+    <div class="card-head">
+      <span class="card-title">{{ ui.icon('bar-chart', 15) }} Distribution</span>
+      <span class="card-note">Share of each difficulty available on LeetCode</span>
+    </div>
+    <div class="card-pad dist">
+      {% for label, solved, pool, cls in [
+        ('Easy', stats.easySolved, 800, 'easy'),
+        ('Medium', stats.mediumSolved, 1700, 'medium'),
+        ('Hard', stats.hardSolved, 700, 'hard')
+      ] %}
+      <div class="dist-row">
+        <span class="dist-label c-{{ cls }}">{{ label }}</span>
+        <div class="dist-track">
+          <div class="dist-fill {{ cls }}" style="width: {{ [(solved / pool * 100), 100] | min | round(1) }}%"></div>
         </div>
-
-        <div class="progress-item">
-          <div class="progress-label">
-            <span>Medium Problems</span>
-            <span>{{ stats.mediumSolved }} / ~1700</span>
-          </div>
-          <div class="progress-bar-container">
-            <div class="progress-bar medium" style="width: {{ (stats.mediumSolved / 1700 * 100) | round }}%"></div>
-          </div>
-        </div>
-
-        <div class="progress-item">
-          <div class="progress-label">
-            <span>Hard Problems</span>
-            <span>{{ stats.hardSolved }} / ~700</span>
-          </div>
-          <div class="progress-bar-container">
-            <div class="progress-bar hard" style="width: {{ (stats.hardSolved / 700 * 100) | round }}%"></div>
-          </div>
-        </div>
+        <span class="dist-count"><b>{{ solved }}</b> / {{ pool }}</span>
       </div>
+      {% endfor %}
     </div>
-    {% endif %}
+  </div>
+  {% endif %}
 
-    <!-- Recent Submissions -->
-    <div class="content-section">
-      <h2 class="section-title">
-        <span>📝</span>
-        <span>Recent Submissions</span>
-      </h2>
-
+  <div class="card section">
+    <div class="card-head">
+      <span class="card-title">{{ ui.icon('file', 15) }} Recent submissions</span>
       {% if stats.recentSubmissions %}
-      <div class="submissions-list">
-        {% for submission in stats.recentSubmissions %}
-        <div class="submission-item difficulty-{{ submission.difficulty | lower }}">
-          <div>
-            <div class="submission-title">{{ submission.title }}</div>
-            <div class="submission-meta">
-              {{ submission.difficulty }} • {{ submission.timestamp }}
-            </div>
-          </div>
-          <span class="submission-status status-accepted">Accepted</span>
-        </div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <div class="empty-state">
-        <div class="empty-state-icon">📭</div>
-        <p>No recent submissions found</p>
-      </div>
+      <span class="card-note">Last {{ stats.recentSubmissions | length }}</span>
       {% endif %}
     </div>
 
-    <!-- Additional Stats -->
-    {% if stats.contributionPoint > 0 or stats.reputation > 0 %}
-    <div class="content-section">
-      <h2 class="section-title">
-        <span>⭐</span>
-        <span>Community Engagement</span>
-      </h2>
-
-      <div class="stats-grid">
-        {% if stats.contributionPoint > 0 %}
-        <div class="stat-card">
-          <div class="stat-icon">🤝</div>
-          <div class="stat-value" style="color: #8b5cf6;">{{ stats.contributionPoint }}</div>
-          <div class="stat-label">Contribution Points</div>
+    {% if stats.recentSubmissions %}
+    {% for submission in stats.recentSubmissions %}
+    <div class="sub-item">
+      <div>
+        <div class="sub-title">{{ submission.title }}</div>
+        <div class="sub-meta">
+          <span class="c-{{ submission.difficulty | lower }}">{{ submission.difficulty }}</span>
+          · {{ submission.timestamp }}
         </div>
-        {% endif %}
-
-        {% if stats.reputation > 0 %}
-        <div class="stat-card">
-          <div class="stat-icon">⭐</div>
-          <div class="stat-value" style="color: #f59e0b;">{{ stats.reputation }}</div>
-          <div class="stat-label">Reputation</div>
-        </div>
-        {% endif %}
       </div>
+      <span class="badge badge-success">Accepted</span>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty">
+      {{ ui.icon('inbox', 30) }}
+      <div class="empty-title">No recent submissions</div>
+      <div class="empty-text">Solved problems will appear here once the profile syncs.</div>
     </div>
     {% endif %}
   </div>
-  <script>
-    window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
-  </script>
-  <script defer src="/_vercel/speed-insights/script.js"></script>
-</body>
 
-</html>
+  {% if stats.reputation and stats.reputation > 0 %}
+  <div class="card section card-pad">
+    <div class="row-between">
+      <span class="card-title">Community reputation</span>
+      <span class="metric-value" style="font-size:19px">{{ stats.reputation }}</span>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const REG = {{ student.register_number | tojson }};
+    const AUTO_REFRESH_MS = 120000;
+
+    const btn = document.getElementById('refreshBtn');
+    const label = btn.querySelector('[data-label]');
+    const msg = document.getElementById('refreshMessage');
+    const counts = {
+      easy: document.getElementById('easy-count'),
+      medium: document.getElementById('medium-count'),
+      hard: document.getElementById('hard-count'),
+      total: document.getElementById('total-count'),
+    };
+
+    function paint(stats) {
+      if (!stats) return;
+      counts.easy.textContent = stats.easy;
+      counts.medium.textContent = stats.medium;
+      counts.hard.textContent = stats.hard;
+      counts.total.textContent = stats.total;
+    }
+
+    function note(text, tone) {
+      msg.textContent = text;
+      msg.className = 'refresh-note ' + (tone === 'error' ? 'c-hard' : tone === 'ok' ? 'c-easy' : 'muted');
+    }
+
+    btn.addEventListener('click', async function () {
+      btn.disabled = true;
+      label.textContent = 'Refreshing…';
+      note('');
+
+      try {
+        const res = await fetch('/api/refresh-student/' + encodeURIComponent(REG), { method: 'POST' });
+        const data = await res.json();
+
+        if (data.success) {
+          paint(data.stats);
+          note(data.message, 'ok');
+        } else {
+          note(data.message, 'error');
+        }
+      } catch (err) {
+        note('Could not reach the server. Try again in a moment.', 'error');
+      }
+
+      btn.disabled = false;
+      label.textContent = 'Refresh';
+    });
+
+    // Poll the DB-only endpoint so an open tab picks up whatever the
+    // background refresh has written, without triggering a live API call.
+    setInterval(async function () {
+      try {
+        const res = await fetch('/api/student-stats/' + encodeURIComponent(REG));
+        const data = await res.json();
+        if (data.success) paint(data.stats);
+      } catch (err) { /* transient - next tick retries */ }
+    }, AUTO_REFRESH_MS);
+  })();
+</script>
+{% endblock %}

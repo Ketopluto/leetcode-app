@@ -1,5 +1,8 @@
 from flask import Flask, Blueprint
 from flask_caching import Cache
+from flask_wtf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from app.config import Config
 from app.models import db
 from app.logger import log_info, log_warning, log_error
@@ -40,12 +43,14 @@ else:
 # Initialize extensions
 cache = Cache(app)
 db.init_app(app)
+csrf = CSRFProtect(app)
+limiter = Limiter(get_remote_address, app=app, default_limits=[], storage_uri="memory://")
 
-# Create upload folder if it doesn't exist
+# Create upload folder if it doesn't exist (filesystem is read-only on Vercel)
 try:
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-except:
-    pass  # Read-only filesystem on Vercel
+except OSError as e:
+    log_warning(f"Could not create upload folder: {e}", tag="Startup")
 
 # Initialize database tables (wrapped in try-except for graceful failure)
 try:
@@ -68,7 +73,6 @@ from app import routes
 # Initialize background scheduler for automated tasks
 # NOTE: On Vercel (serverless), the scheduler won't work. Use external cron service
 # to call POST /api/cron/weekly-reports endpoint instead.
-import os
 IS_VERCEL = os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV')
 IS_RELOADER = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
 

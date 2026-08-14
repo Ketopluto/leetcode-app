@@ -1,78 +1,99 @@
-# 🚀 LeetCode Statistics Dashboard
+# LeetCode Statistics Dashboard
 
-🎉 Welcome to the **LeetCode Statistics Dashboard**! This is a **Flask-based web application** designed to track and visualize student statistics from LeetCode.  
+A Flask web app that tracks LeetCode problem-solving stats for a class/cohort of students, with an admin panel for roster management and automated weekly progress reports for the HoD.
 
-🌐 **Live App:** [LeetCode App on Render](https://leetcode-app.onrender.com/)  
+**Live app:** https://leetcode-app.vercel.app _(update if the deployment URL changes)_
 
----
+## Features
 
-## ✨ Features
+- **Leaderboard** — per-student easy/medium/hard/total solved counts, filterable by year and section.
+- **Student profiles** — detailed stats, recent submissions, and acceptance rate pulled live from LeetCode.
+- **Admin panel** — upload a roster via Excel (`.xlsx`/`.xls`), edit/delete students, view upload history.
+- **Weekly reports** — automated summaries of inactive/low-activity students, emailed to the HoD.
+- **Resilient stats fetching** — tries multiple third-party LeetCode API mirrors with retries, exponential backoff, and a circuit breaker per source; falls back to last-known DB values if all sources fail.
+- **CSV export** of the leaderboard.
 
-### 🏅 1. Leaderboard Visibility
-View a dynamic **leaderboard** that showcases:
-- 📈 Rankings based on students' performance.
-- 🎯 Detailed statistics for each student.
-- 👀 A clean and interactive interface to track progress.
+## Architecture
 
-### 📥 2. Download CSV
-With just one click, download the leaderboard data as a **CSV file** for:
-- 📊 Data analysis.
-- 📝 Generating reports.
-- 📤 Sharing performance insights with others.
-
----
-
-## 🚀 Deployment
-
-The app is live and hosted on **Render**.  
-🔗 Check it out here: [LeetCode App](https://leetcode-app.onrender.com/)
-
----
-
-## 🛠️ Usage Instructions
-
-### 👉 Run Locally
-Clone the repository and set up the app on your local machine:  
-```bash
-git clone https://github.com/your-repo-name.git
-cd your-repo-name
+```
+app/
+  main.py          WSGI entry point
+  __init__.py      Flask app factory, extensions (DB, cache, CSRF, rate limiter)
+  routes.py        All HTTP routes
+  models.py        SQLAlchemy models (Student, StudentStats, WeeklyReport, ...)
+  leetcode_api.py  Multi-source LeetCode stats fetcher with circuit breaker
+  reports.py       Weekly report generation logic
+  email_service.py SMTP email sending
+  scheduler.py     APScheduler background jobs (non-serverless hosting only)
+  config.py        Environment-driven configuration
+  logger.py        Centralized logging
+  templates/       Server-rendered HTML (no frontend build step)
+  static/          CSS/JS assets
 ```
 
-Create a virtual environment and install dependencies:
+Stats are cached in-memory (short TTL) and persisted to the database, so pages stay fast even when the upstream LeetCode API mirrors are slow or down.
+
+## Local Setup
+
+Requires Python 3.11+.
 
 ```bash
+git clone https://github.com/Ketopluto/leetcode-app.git
+cd leetcode-app
+
 python -m venv venv
-source venv/bin/activate   # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
+source venv/bin/activate   # Windows: venv\Scripts\activate
+
+pip install -r requirements-dev.txt   # includes runtime deps + pytest
 ```
 
-Run the Flask app:
+Copy `.env.example` to `.env` and fill in at least `SECRET_KEY` and `HOD_PASSWORD` (see the file for how to generate a key). With `FLASK_ENV=development` set, the app will auto-generate throwaway values for local runs if you skip this — but it'll print the generated admin password to the console, so set your own if you want repeatable logins.
 
 ```bash
-flask run
+flask --app app.main run --debug
 ```
 
-#Access it locally at: http://127.0.0.1:5000/
+App runs at http://127.0.0.1:5000/.
 
-## 🛠️ Tech Stack
-- Frontend: 🖌️ HTML, CSS
-- Backend: 🐍 Python, Flask
-- Deployment: 🚀 Render
+## Running Tests
 
-## 🤝 Contributing
-I love contributions! 💙
+```bash
+pytest
+```
 
-Found a bug? 🐛 Open an issue.
-Have a feature request? 💡 Let me know!
-Want to contribute? 🛠️ Fork the repo and submit a pull request.
+## Deployment
 
-## 📜 License
-This project is licensed under the MIT License. See the LICENSE file for more details.
+**Primary: Vercel** (serverless, config in `vercel.json`). Because Vercel is serverless, the in-process scheduler (`app/scheduler.py`) does not run there — instead, an external cron service (e.g. [cron-job.org](https://cron-job.org)) should call:
 
-## ❤️ Thank You!
-Thanks for checking out the LeetCode Statistics Dashboard! We hope it helps you stay on top of your coding game. 🎯
+- `GET/POST /api/cron/refresh-stats?secret=<CRON_SECRET>` — refreshes a batch of students' stats (designed to run every couple of minutes, batched to fit serverless time limits).
+- `GET/POST /api/cron/weekly-reports?secret=<CRON_SECRET>` — generates and emails the weekly report (run once a week).
 
-📧 Questions? Suggestions? Reach out to me anytime. 🚀
+Set `CRON_SECRET` in the Vercel project's environment variables and use the same value in the cron service URL.
 
-# ✨ Live Link: LeetCode App on Render
-[LeetCode App](https://leetcode-app.onrender.com/)
+**Alternative: Render** (traditional long-running server, config in `render.yaml`). On Render, `app/scheduler.py` runs in-process via APScheduler, so the cron endpoints above aren't needed — stats refresh and weekly reports happen automatically.
+
+Either way, set the required environment variables (see `.env.example`) in the platform's dashboard — the app will refuse to start in production without `SECRET_KEY` and `HOD_PASSWORD` set.
+
+## Key API Endpoints
+
+| Route | Method | Auth | Purpose |
+|---|---|---|---|
+| `/` | GET | — | Leaderboard |
+| `/student/<register_number>` | GET | — | Student profile |
+| `/api/stats` | GET | — | JSON leaderboard data |
+| `/download` | GET | — | CSV export |
+| `/health` | GET | — | Health check |
+| `/admin` | GET | session | Admin dashboard |
+| `/admin/login` | POST | rate-limited | HoD login |
+| `/admin/upload` | POST | session | Upload roster Excel |
+| `/admin/reports` | GET | session | Weekly reports dashboard |
+| `/api/cron/refresh-stats` | GET/POST | `CRON_SECRET` | External cron: refresh stats batch |
+| `/api/cron/weekly-reports` | GET/POST | `CRON_SECRET` | External cron: generate + email reports |
+
+## Contributing
+
+Issues and PRs are welcome. Please run `pytest` before submitting a PR.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
