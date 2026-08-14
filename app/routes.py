@@ -2,6 +2,8 @@ import csv
 import os
 import io
 import time
+import random
+import secrets
 import threading
 import asyncio
 import aiohttp
@@ -10,26 +12,72 @@ from flask import render_template, make_response, request, jsonify, redirect, ur
 from werkzeug.utils import secure_filename
 import pandas as pd
 
-from app import app, cache, db
+from app import app, cache, db, csrf, limiter
 from app.models import Student, UploadLog, StudentStats, WeeklyReport
-from app.logger import log_info, log_error, log_debug, log_exception
+from app.logger import log_info, log_warning, log_error, log_debug, log_exception
 from app.leetcode_api import (
     fetch_students_concurrent,
+    fetch_student_detailed_stats,
     get_circuit_breaker_status,
     CACHE_TTL,
     CONCURRENCY,
     TIMEOUT_SECONDS
 )
 
-# -----------------------
-# Configurable tunables (now in leetcode_api.py, kept here for backward compat)
-# -----------------------
-# CACHE_TTL, CONCURRENCY, TIMEOUT_SECONDS imported from leetcode_api
-FETCH_ATTEMPTS = 3  # retry attempts per API source
-# -----------------------
+REFRESH_COOLDOWN_SECONDS = 30  # per-student cooldown for the public "refresh my stats" endpoint
+
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+
+
+# -----------------------
+# Single-flight locking (request coalescing)
+# -----------------------
+# When a cache entry is missing, several concurrent requests would otherwise
+# each independently trigger their own live LeetCode API call for the exact
+# same data ("cache stampede") - multiplying outbound traffic by however many
+# requests land in that window. These per-key locks make every request but
+# one for a given key block briefly and then read the cache the first one
+# just filled, instead of all of them hitting the network.
+#
+# Caveat: this only coordinates requests handled by the *same* process. Under
+# multiple gunicorn workers (Render) or separate serverless invocations
+# (Vercel), each process has its own lock registry, so the effective
+# duplication factor is bounded by worker/instance count, not eliminated
+# entirely. A fully cross-process guarantee would need a shared store
+# (Redis/DB-based lock) - not worth the added infra for this app's scale, but
+# worth knowing if traffic ever grows enough to matter.
+_fetch_locks = {}
+_fetch_locks_guard = threading.Lock()
+
+
+def _lock_for(key):
+    with _fetch_locks_guard:
+        lock = _fetch_locks.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _fetch_locks[key] = lock
+        return lock
+
+
+def detail_cache_key(username):
+    """Cache key for a student's detailed profile stats. Kept in a separate
+    namespace from the leaderboard's `stats:` cache since the two endpoints
+    return differently-shaped payloads (leaderboard: easy/medium/hard/total,
+    detail: easySolved/mediumSolved/.../ranking/recentSubmissions/...)."""
+    return f"detail:{(username or '').strip().lower()}"
+
+
+def jittered_ttl(base_seconds, spread=0.2):
+    """
+    Add +/-`spread` random jitter to a cache TTL. Without this, a bulk
+    operation (roster upload, admin refresh, cold start) caches many entries
+    within the same second, all with the same fixed TTL - they'd then all
+    expire in the same instant, causing a synchronized burst of cache misses
+    (and therefore live API calls) instead of the load spreading out.
+    """
+    return int(base_seconds * random.uniform(1 - spread, 1 + spread))
 
 
 def get_available_year_sections():
@@ -53,11 +101,37 @@ def get_available_year_sections():
     return options
 
 
-def load_students_from_db():
-    """Load all students from database"""
-    students = Student.query.all()
-    return [(s.leetcode_username, s.name, s.register_number, s.year, s.section)
-            for s in students]
+def load_students_with_cached_stats():
+    """
+    Load all students together with their last-known DB stats in a single
+    outer-joined query, instead of three separate full-table scans
+    (Student.query.all() x2 + StudentStats.query.all()). Each extra round
+    trip costs real latency against a remote Postgres instance.
+    """
+    students = []
+    student_id_map = {}  # username.lower() -> student_id
+    db_stats_map = {}    # username.lower() -> {easy_solved, medium_solved, hard_solved, total_solved}
+
+    rows = db.session.query(Student, StudentStats).outerjoin(
+        StudentStats, Student.id == StudentStats.student_id
+    ).all()
+
+    for student, stats in rows:
+        students.append((student.leetcode_username, student.name, student.register_number, student.year, student.section))
+
+        if student.leetcode_username:
+            uname = student.leetcode_username.strip().lower()
+            student_id_map[uname] = student.id
+
+            if stats:
+                db_stats_map[uname] = {
+                    "easy_solved": stats.easy_solved,
+                    "medium_solved": stats.medium_solved,
+                    "hard_solved": stats.hard_solved,
+                    "total_solved": stats.total_solved
+                }
+
+    return students, student_id_map, db_stats_map
 
 
 # NOTE: fetch_students_concurrent is now imported from leetcode_api.py
@@ -73,27 +147,9 @@ def get_all_stats(cache_ttl=CACHE_TTL, concurrency=CONCURRENCY, timeout_seconds=
     4) stores fetched results in memory cache AND database (for fallback),
     5) returns combined list.
     """
-    students = load_students_from_db()  # returns tuples (username, name, roll, year, section)
+    students, student_id_map, db_stats_map = load_students_with_cached_stats()
     cached_results = []
     to_fetch = []
-
-    # Also load student IDs for database operations
-    student_id_map = {}  # username.lower() -> student_id
-    for student in Student.query.all():
-        if student.leetcode_username:
-            student_id_map[student.leetcode_username.strip().lower()] = student.id
-
-    # Load cached stats from database for fallback
-    db_stats_map = {}  # username.lower() -> {easy_solved, medium_solved, hard_solved, total_solved}
-    for stats in StudentStats.query.all():
-        if stats.student:
-            uname = (stats.student.leetcode_username or "").strip().lower()
-            db_stats_map[uname] = {
-                "easy_solved": stats.easy_solved,
-                "medium_solved": stats.medium_solved,
-                "hard_solved": stats.hard_solved,
-                "total_solved": stats.total_solved
-            }
 
     # collect cached ones and decide which to fetch
     for username, name, roll, year, section in students:
@@ -110,77 +166,101 @@ def get_all_stats(cache_ttl=CACHE_TTL, concurrency=CONCURRENCY, timeout_seconds=
 
     # fetch missing ones concurrently using robust API module
     if to_fetch:
-        try:
-            fetched = asyncio.run(fetch_students_concurrent(
-                to_fetch,
-                cached_stats_map=db_stats_map,
-                concurrency=concurrency
-            ))
-        except Exception as e:
-            # on a catastrophic failure, fallback to DB cached results
-            log_error(f"Error during concurrent fetch: {e}", tag="API")
-            fetched = []
-            # Build fallback results from database
+        # Single-flight: if another request is already fetching this batch of
+        # cache misses (e.g. several people load the dashboard/CSV export at
+        # once right after cache expiry), block briefly instead of also
+        # hitting the network, then re-check cache for what the first caller
+        # already filled.
+        with _lock_for("get_all_stats:full-roster"):
+            still_to_fetch = []
             for username, name, roll, year, section in to_fetch:
-                uname = (username or "").strip().lower()
-                db_cached = db_stats_map.get(uname, {})
-                year_suffix = 'st' if year == 1 else 'nd' if year == 2 else 'rd' if year == 3 else 'th'
-                year_str = f"{year}{year_suffix} Year"
-                year_display = f"{year_str} ({section})" if section else year_str
-                fetched.append({
-                    "roll_no": roll,
-                    "actual_name": name,
-                    "username": username,
-                    "year": year_str,
-                    "year_display": year_display,
-                    "year_number": year,
-                    "section": section,
-                    "easy": db_cached.get("easy_solved", 0),
-                    "medium": db_cached.get("medium_solved", 0),
-                    "hard": db_cached.get("hard_solved", 0),
-                    "total": db_cached.get("total_solved", 0),
-                    "fetch_error": None,
-                    "is_stale": True,
-                    "fetched_at": int(time.time())
-                })
+                key = f"stats:{(username or '').strip().lower()}"
+                try:
+                    cached = cache.get(key)
+                except Exception:
+                    cached = None
+                if cached and isinstance(cached, dict):
+                    cached_results.append(cached)
+                else:
+                    still_to_fetch.append((username, name, roll, year, section))
+            to_fetch = still_to_fetch
 
-        # save to memory cache AND database
-        for item in fetched:
-            try:
-                uname = (item.get("username") or "").strip().lower()
-                
-                # Save to memory cache
-                cache_key = f"stats:{uname}"
-                cache.set(cache_key, item, timeout=cache_ttl)
-                
-                # Save to database (for fallback on future failures)
-                # Only update DB if we got fresh data (not stale) and there's no error
-                is_stale = item.get("is_stale", False)
-                has_error = item.get("fetch_error") is not None
-                if not is_stale and not has_error:
-                    student_id = student_id_map.get(uname)
-                    if student_id:
-                        stats = StudentStats.query.filter_by(student_id=student_id).first()
-                        if not stats:
-                            stats = StudentStats(student_id=student_id)
-                            db.session.add(stats)
-                        
-                        stats.easy_solved = item.get("easy", 0)
-                        stats.medium_solved = item.get("medium", 0)
-                        stats.hard_solved = item.get("hard", 0)
-                        stats.total_solved = item.get("total", 0)
-                        stats.last_updated = datetime.utcnow()
-                        stats.is_stale = False
-                        
-            except Exception as e:
-                log_error(f"Error saving stats for {uname}: {e}", tag="DB")
-        
-        # Commit database changes
-        try:
-            db.session.commit()
-        except Exception as e:
-            log_error(f"Error committing stats to database: {e}", tag="DB")
-            db.session.rollback()
+            fetched = []
+            if to_fetch:
+                try:
+                    fetched = asyncio.run(fetch_students_concurrent(
+                        to_fetch,
+                        cached_stats_map=db_stats_map,
+                        concurrency=concurrency
+                    ))
+                except Exception as e:
+                    # on a catastrophic failure, fallback to DB cached results
+                    log_error(f"Error during concurrent fetch: {e}", tag="API")
+                    fetched = []
+                    # Build fallback results from database
+                    for username, name, roll, year, section in to_fetch:
+                        uname = (username or "").strip().lower()
+                        db_cached = db_stats_map.get(uname, {})
+                        year_suffix = 'st' if year == 1 else 'nd' if year == 2 else 'rd' if year == 3 else 'th'
+                        year_str = f"{year}{year_suffix} Year"
+                        year_display = f"{year_str} ({section})" if section else year_str
+                        fetched.append({
+                            "roll_no": roll,
+                            "actual_name": name,
+                            "username": username,
+                            "year": year_str,
+                            "year_display": year_display,
+                            "year_number": year,
+                            "section": section,
+                            "easy": db_cached.get("easy_solved", 0),
+                            "medium": db_cached.get("medium_solved", 0),
+                            "hard": db_cached.get("hard_solved", 0),
+                            "total": db_cached.get("total_solved", 0),
+                            "fetch_error": None,
+                            "is_stale": True,
+                            "fetched_at": int(time.time())
+                        })
+
+                # save to memory cache AND database
+                for item in fetched:
+                    try:
+                        uname = (item.get("username") or "").strip().lower()
+
+                        # Save to memory cache (small TTL jitter so many
+                        # entries cached around the same moment don't all
+                        # expire in the same instant and cause another
+                        # simultaneous burst of misses later on)
+                        cache_key = f"stats:{uname}"
+                        cache.set(cache_key, item, timeout=jittered_ttl(cache_ttl))
+
+                        # Save to database (for fallback on future failures)
+                        # Only update DB if we got fresh data (not stale) and there's no error
+                        is_stale = item.get("is_stale", False)
+                        has_error = item.get("fetch_error") is not None
+                        if not is_stale and not has_error:
+                            student_id = student_id_map.get(uname)
+                            if student_id:
+                                stats = StudentStats.query.filter_by(student_id=student_id).first()
+                                if not stats:
+                                    stats = StudentStats(student_id=student_id)
+                                    db.session.add(stats)
+
+                                stats.easy_solved = item.get("easy", 0)
+                                stats.medium_solved = item.get("medium", 0)
+                                stats.hard_solved = item.get("hard", 0)
+                                stats.total_solved = item.get("total", 0)
+                                stats.last_updated = datetime.utcnow()
+                                stats.is_stale = False
+
+                    except Exception as e:
+                        log_error(f"Error saving stats for {uname}: {e}", tag="DB")
+
+                # Commit database changes
+                try:
+                    db.session.commit()
+                except Exception as e:
+                    log_error(f"Error committing stats to database: {e}", tag="DB")
+                    db.session.rollback()
 
         results = cached_results + fetched
     else:
@@ -212,122 +292,48 @@ def refresh_all_stats_in_background(cache_ttl=CACHE_TTL, concurrency=CONCURRENCY
 # -----------------------
 # Detailed single student fetch (used in profile view)
 # -----------------------
-async def _fetch_detailed_with_session(username, session, timeout_seconds=10):
-    """Async helper to fetch detailed LeetCode stats for a single username."""
-    if not username or username.lower() == "higher studies":
-        return None
-
-    base_url = "https://alfa-leetcode-api-blush.vercel.app"
-    profile_url = f"{base_url}/{username}"
-    solved_url = f"{base_url}/{username}/solved"
-    submission_url = f"{base_url}/{username}/submission?limit=20"
-    
+# NOTE: fetch_student_detailed_stats is imported from leetcode_api.py, which
+# runs it through the same 4-source fallback + circuit breaker chain used by
+# the leaderboard fetch (plus best-effort ranking/reputation/submissions
+# from the alfa mirrors specifically, since only they expose those fields).
+async def _fetch_detailed_with_new_session(username, timeout_seconds=TIMEOUT_SECONDS):
     timeout = aiohttp.ClientTimeout(total=timeout_seconds)
-    try:
-        async with aiohttp.ClientSession(timeout=timeout) as s:
-            # Fetch all endpoints concurrently
-            results = await asyncio.gather(
-                s.get(profile_url),
-                s.get(solved_url),
-                s.get(submission_url),
-                return_exceptions=True
-            )
-            
-            profile_data = {}
-            solved_data = {}
-            submission_data = {}
-            
-            # Process profile
-            if isinstance(results[0], aiohttp.ClientResponse) and results[0].status == 200:
-                profile_data = await results[0].json()
-            
-            # Process solved
-            if isinstance(results[1], aiohttp.ClientResponse) and results[1].status == 200:
-                solved_data = await results[1].json()
-            
-            # Process submissions
-            if isinstance(results[2], aiohttp.ClientResponse) and results[2].status == 200:
-                submission_data = await results[2].json()
-            
-            # Calculate acceptance rate from acSubmissionNum and totalSubmissionNum
-            acceptance_rate = 0
-            total_submissions_data = solved_data.get("totalSubmissionNum", [])
-            ac_submissions_data = solved_data.get("acSubmissionNum", [])
-            
-            all_total = next((x for x in total_submissions_data if x.get('difficulty') == 'All'), None)
-            all_ac = next((x for x in ac_submissions_data if x.get('difficulty') == 'All'), None)
-            
-            if all_total and all_ac:
-                total_sub_count = all_total.get('submissions', 0)
-                ac_sub_count = all_ac.get('submissions', 0)
-                if total_sub_count > 0:
-                    acceptance_rate = round((ac_sub_count / total_sub_count) * 100, 2)
-            
-            recent_submissions = submission_data.get("submission", [])[:20]
-            
-            return {
-                "username": username,
-                "totalSolved": solved_data.get("solvedProblem", 0),
-                "easySolved": solved_data.get("easySolved", 0),
-                "mediumSolved": solved_data.get("mediumSolved", 0),
-                "hardSolved": solved_data.get("hardSolved", 0),
-                "totalSubmissions": solved_data.get("totalSubmissionNum", []),
-                "recentSubmissions": recent_submissions,
-                "ranking": profile_data.get("ranking", 0),
-                "contributionPoint": 0,  # Not available in this API
-                "reputation": profile_data.get("reputation", 0),
-                "acceptance_rate": acceptance_rate,
-                "profile_url": f"https://leetcode.com/u/{username}/"
-            }
-    except Exception as e:
-        log_error(f"Error fetching detailed stats for {username}: {e}", tag="API")
-    return None
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        return await fetch_student_detailed_stats(username, session, timeout_seconds)
+
+
+def _default_detailed_stats(username):
+    return {
+        "username": username,
+        "totalSolved": 0,
+        "easySolved": 0,
+        "mediumSolved": 0,
+        "hardSolved": 0,
+        "totalSubmissions": [],
+        "recentSubmissions": [],
+        "ranking": 0,
+        "contributionPoint": 0,
+        "reputation": 0,
+        "acceptance_rate": 0,
+        "profile_url": f"https://leetcode.com/u/{username}/"
+    }
 
 
 def fetch_detailed_leetcode_stats(username):
     """Synchronous wrapper used by Flask to fetch detailed stats for a single student."""
     if not username or username.lower() == "higher studies":
-        return {
-            "username": username,
-            "totalSolved": 0,
-            "easySolved": 0,
-            "mediumSolved": 0,
-            "hardSolved": 0,
-            "totalSubmissions": [],
-            "recentSubmissions": [],
-            "ranking": 0,
-            "contributionPoint": 0,
-            "reputation": 0,
-            "profile_url": f"https://leetcode.com/u/{username}/"
-        }
+        return _default_detailed_stats(username)
     try:
-        # run short async helper
-        return asyncio.run(_fetch_detailed_with_session(username, None))
+        result = asyncio.run(_fetch_detailed_with_new_session(username))
+        return result or _default_detailed_stats(username)
     except Exception as e:
         log_error(f"fetch_detailed_leetcode_stats error: {e}", tag="API")
-        return {
-            "username": username,
-            "totalSolved": 0,
-            "easySolved": 0,
-            "mediumSolved": 0,
-            "hardSolved": 0,
-            "totalSubmissions": [],
-            "recentSubmissions": [],
-            "ranking": 0,
-            "contributionPoint": 0,
-            "reputation": 0,
-            "profile_url": f"https://leetcode.com/u/{username}/"
-        }
+        return _default_detailed_stats(username)
 
 
 # -----------------------
 # Flask routes (your existing endpoints, adapted to use optimized fetcher)
 # -----------------------
-
-def get_all_stats_deprecated():
-    """Deprecated alias kept for backward compatibility if code calls it explicitly."""
-    return get_all_stats()
-
 
 @app.route("/")
 def index():
@@ -363,7 +369,27 @@ def student_profile(register_number):
     username = student.leetcode_username
 
     try:
-        stats = fetch_detailed_leetcode_stats(username)
+        cache_key = detail_cache_key(username)
+        try:
+            stats = cache.get(cache_key)
+        except Exception:
+            stats = None
+
+        if not stats:
+            # Single-flight: only one concurrent request per username actually
+            # calls the live API; the rest wait briefly and reuse its result.
+            with _lock_for(cache_key):
+                try:
+                    stats = cache.get(cache_key)
+                except Exception:
+                    stats = None
+                if not stats:
+                    stats = fetch_detailed_leetcode_stats(username)
+                    if stats:
+                        try:
+                            cache.set(cache_key, stats, timeout=jittered_ttl(CACHE_TTL))
+                        except Exception:
+                            pass
 
         return render_template(
             "student_profile.html",
@@ -377,32 +403,56 @@ def student_profile(register_number):
 
 
 @app.route("/api/refresh-student/<register_number>", methods=['POST'])
+@csrf.exempt
+@limiter.limit("10 per minute")
 def api_refresh_single_student(register_number):
     """
     Quickly refresh stats for a single student.
     Much faster than refreshing everyone!
+
+    This is a public, unauthenticated endpoint (anyone with the profile URL
+    can click "Refresh My Stats"), so on top of the per-IP rate limit above,
+    it enforces a short per-student cooldown - shared across all callers -
+    so it can't be used to hammer a single student's data via many IPs/tabs.
     """
     student = Student.query.filter_by(register_number=register_number).first()
-    
+
     if not student:
         return jsonify({'success': False, 'message': 'Student not found'}), 404
-    
+
     username = student.leetcode_username
-    
+
     if not username or username.lower() == "higher studies":
         return jsonify({'success': False, 'message': 'Invalid LeetCode username'}), 400
-    
+
+    cooldown_key = f"refresh-cooldown:{register_number}"
+    if cache.get(cooldown_key):
+        return jsonify({
+            'success': False,
+            'message': 'This student was just refreshed - please wait a bit before trying again.'
+        }), 429
+    cache.set(cooldown_key, True, timeout=REFRESH_COOLDOWN_SECONDS)
+
     try:
-        # Clear this student's cache entry
-        cache_key = f"stats:{username.strip().lower()}"
+        # Clear this student's leaderboard cache entry (different shape/namespace
+        # from the detail cache - see detail_cache_key()) so the leaderboard
+        # re-fetches instead of showing stale data.
         try:
-            cache.delete(cache_key)
+            cache.delete(f"stats:{username.strip().lower()}")
         except Exception:
             pass
-        
+
         # Fetch fresh stats from API
         stats = fetch_detailed_leetcode_stats(username)
-        
+
+        # Write straight through to the detail cache so the profile page
+        # reflects this refresh immediately instead of re-fetching.
+        if stats:
+            try:
+                cache.set(detail_cache_key(username), stats, timeout=jittered_ttl(CACHE_TTL))
+            except Exception:
+                pass
+
         if stats:
             # Update database
             student_stats = StudentStats.query.filter_by(student_id=student.id).first()
@@ -440,6 +490,33 @@ def api_refresh_single_student(register_number):
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 
+@app.route("/api/student-stats/<register_number>")
+def api_student_stats(register_number):
+    """
+    Lightweight DB-only stats read for a single student - no live LeetCode API
+    call, just a StudentStats row lookup. Used by the profile page's
+    auto-refresh polling so an open tab picks up whatever the periodic
+    cron/scheduler refresh has written to the DB, without hammering the
+    live API on every poll tick.
+    """
+    student = Student.query.filter_by(register_number=register_number).first()
+    if not student:
+        return jsonify({'success': False, 'message': 'Student not found'}), 404
+
+    stats = StudentStats.query.filter_by(student_id=student.id).first()
+
+    return jsonify({
+        'success': True,
+        'stats': {
+            'easy': stats.easy_solved if stats else 0,
+            'medium': stats.medium_solved if stats else 0,
+            'hard': stats.hard_solved if stats else 0,
+            'total': stats.total_solved if stats else 0,
+        },
+        'last_updated': stats.last_updated.isoformat() if stats and stats.last_updated else None,
+    })
+
+
 @app.route("/admin")
 def admin():
     """Admin panel for HoD to upload Excel files"""
@@ -454,11 +531,12 @@ def admin():
 
 
 @app.route("/admin/login", methods=['GET', 'POST'])
+@limiter.limit("5 per minute", methods=['POST'])
 def admin_login():
     """HoD login page"""
     if request.method == 'POST':
-        password = request.form.get('password')
-        if password == app.config['HOD_PASSWORD']:
+        password = request.form.get('password') or ''
+        if secrets.compare_digest(password, app.config['HOD_PASSWORD']):
             session['hod_authenticated'] = True
             session.permanent = True
             return redirect(url_for('admin'))
@@ -824,15 +902,16 @@ def admin_refresh_stats():
 
 @app.route("/download")
 def download_csv():
+    """
+    CSV export. Reads from the DB only - same as /api/stats's fast path -
+    rather than calling get_all_stats(), which can trigger live LeetCode API
+    calls. This is a public, unauthenticated GET endpoint; it must never be
+    able to trigger third-party API traffic on demand. Freshness comes from
+    the existing background refresh (cron/scheduler), same as the dashboard.
+    """
     selected_filter = request.args.get("year", None)
 
-    all_results = get_all_stats()
-
-    if selected_filter:
-        results = [r for r in all_results if r["year_display"] == selected_filter]
-    else:
-        results = all_results
-
+    results = get_stats_from_db(selected_filter)
     results.sort(key=lambda x: x["roll_no"])
 
     output = io.StringIO()
@@ -860,10 +939,16 @@ def api_stats():
     
     Query params:
         - year: Filter by year/section (e.g., "2nd Year (A)")
-        - force_refresh: If "1" or "true", clears cache and fetches fresh data from LeetCode API
+        - force_refresh: If "1" or "true", clears cache and fetches fresh data from LeetCode API.
+          Requires an authenticated HoD session - this endpoint is public, and a live full-roster
+          fetch against third-party LeetCode API mirrors is not something an anonymous caller
+          should be able to trigger on demand (they could just keep calling it).
     """
     selected_filter = request.args.get("year", None)
     force_refresh = request.args.get("force_refresh", "").lower() in ("1", "true")
+    if force_refresh and not session.get('hod_authenticated'):
+        log_warning("Ignoring unauthenticated force_refresh request on /api/stats", tag="API")
+        force_refresh = False
     IS_VERCEL = os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV')
 
     log_debug(f"API called with filter: '{selected_filter}', force_refresh: {force_refresh}, Vercel: {bool(IS_VERCEL)}", tag="API")
@@ -1063,6 +1148,7 @@ def api_circuit_breaker_status():
 # -----------------------
 
 @app.route("/api/cron/weekly-reports", methods=['POST', 'GET'])
+@csrf.exempt
 def api_cron_weekly_reports():
     """
     External cron endpoint to trigger weekly report generation.
@@ -1078,8 +1164,6 @@ def api_cron_weekly_reports():
     Optional params:
     - send_email=true (default: false on Vercel to avoid timeout)
     """
-    import os
-    
     # Simple secret-based auth for cron jobs
     cron_secret = os.environ.get('CRON_SECRET', '')
     provided_secret = request.args.get('secret', '')
@@ -1143,17 +1227,14 @@ def api_cron_weekly_reports():
 
 
 @app.route("/api/cron/refresh-stats", methods=['POST', 'GET'])
+@csrf.exempt
 def api_cron_refresh_stats():
     """
     External cron endpoint - optimized for Vercel cold starts.
     Uses paginated DB queries to avoid loading all students.
     """
-    import os
-    import time as time_module
-    import asyncio
-    
-    start_total = time_module.time()
-    
+    start_total = time.time()
+
     cron_secret = os.environ.get('CRON_SECRET', '')
     provided_secret = request.args.get('secret', '')
     
@@ -1257,7 +1338,7 @@ def api_cron_refresh_stats():
         except Exception:
             db.session.rollback()
         
-        elapsed = round(time_module.time() - start_total, 1)
+        elapsed = round(time.time() - start_total, 1)
         
         response = jsonify({"ok": True, "b": batch_num + 1, "of": batches, "n": updated, "t": elapsed})
         response.headers['Connection'] = 'close'

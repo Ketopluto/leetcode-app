@@ -18,14 +18,24 @@ from dataclasses import dataclass, field
 # Configuration
 # -----------------------
 CACHE_TTL = 300            # seconds each student's stats are cached in memory
-CONCURRENCY = 30           # reduced from 50 to be more gentle on APIs
+# Concurrent connections *to a single upstream host* (aiohttp limit_per_host).
+# Lowered from 30: that many simultaneous connections to one free-tier
+# community mirror during a cold-cache full-roster fetch is aggressive for
+# a shared third-party service, even though the fallback chain means it's
+# rarely sustained. 10 still fetches a few hundred students in seconds.
+CONCURRENCY = 10
 TIMEOUT_SECONDS = 10       # increased from 5 for reliability
-MAX_RETRIES = 3            # retry attempts per API source
+# Retry attempts per API source. With 4 fallback sources and a circuit
+# breaker already providing resilience, 3 retries meant a single degraded
+# source could stall a fetch for ~30s before failing over (worst case ~120s
+# across all 4 sources). 2 keeps one retry for transient blips while roughly
+# halving that worst-case wait.
+MAX_RETRIES = 2
 CIRCUIT_BREAKER_THRESHOLD = 5   # failures before circuit opens
 CIRCUIT_BREAKER_TIMEOUT = 300   # seconds to wait before retrying failed API
 
-# Exponential backoff delays (seconds)
-BACKOFF_DELAYS = [0.2, 0.4, 0.8]
+# Exponential backoff delay (seconds) before the single retry
+BACKOFF_DELAYS = [0.3, 0.6]
 
 # -----------------------
 # API Sources (in order of preference)
@@ -359,6 +369,151 @@ async def fetch_students_concurrent(
         tasks = [asyncio.create_task(guarded_fetch(s)) for s in students_to_fetch]
         results = await asyncio.gather(*tasks, return_exceptions=False)
         return results
+
+
+# -----------------------
+# Detailed single-student fetch (profile page)
+# -----------------------
+# Only the alfa-family mirrors expose ranking/reputation/recent-submissions/
+# acceptance-rate; the other 2 fallback sources only return solved counts.
+ALFA_SOURCES = [s for s in API_SOURCES if s["parser"] == "alfa"]
+
+
+async def _fetch_json_guarded(
+    url: str,
+    api_name: str,
+    session: aiohttp.ClientSession,
+    timeout_seconds: int = TIMEOUT_SECONDS
+) -> Optional[dict]:
+    """GET a URL with the same circuit-breaker + retry/backoff protection as
+    fetch_from_api, returning raw JSON instead of a parsed stats dict."""
+    if circuit_breaker.is_open(api_name):
+        return None
+
+    timeout = aiohttp.ClientTimeout(total=timeout_seconds)
+    for attempt in range(MAX_RETRIES):
+        try:
+            async with session.get(url, timeout=timeout) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    circuit_breaker.record_success(api_name)
+                    return data
+
+                elif resp.status == 404:
+                    return {}
+
+                elif 500 <= resp.status < 600:
+                    circuit_breaker.record_failure(api_name)
+                    if attempt < MAX_RETRIES - 1:
+                        await asyncio.sleep(BACKOFF_DELAYS[attempt])
+                    continue
+
+                else:
+                    circuit_breaker.record_failure(api_name)
+                    return None
+
+        except asyncio.TimeoutError:
+            circuit_breaker.record_failure(api_name)
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(BACKOFF_DELAYS[attempt])
+
+        except aiohttp.ClientError:
+            circuit_breaker.record_failure(api_name)
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(BACKOFF_DELAYS[attempt])
+
+        except Exception:
+            circuit_breaker.record_failure(api_name)
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(BACKOFF_DELAYS[attempt])
+
+    return None
+
+
+async def fetch_alfa_bonus_data(
+    username: str,
+    session: aiohttp.ClientSession,
+    timeout_seconds: int = TIMEOUT_SECONDS
+) -> Tuple[dict, dict, dict]:
+    """
+    Best-effort profile/solved/submission data for the profile page's
+    ranking, reputation, acceptance rate, and recent submissions. Tries
+    alfa-vercel then alfa-render (in that order, each respecting the shared
+    circuit breaker) since these fields aren't available from the other
+    fallback mirrors. Returns ({}, {}, {}) if both alfa sources are down or
+    circuit-open rather than failing the whole profile fetch - the caller
+    still has reliable solved counts from fetch_stats_with_fallback.
+    """
+    for api in ALFA_SOURCES:
+        name = api["name"]
+        if circuit_breaker.is_open(name):
+            continue
+
+        base = api["base_url"]
+        profile_data, solved_data, submission_data = await asyncio.gather(
+            _fetch_json_guarded(f"{base}/{username}", name, session, timeout_seconds),
+            _fetch_json_guarded(f"{base}/{username}/solved", name, session, timeout_seconds),
+            _fetch_json_guarded(f"{base}/{username}/submission?limit=20", name, session, timeout_seconds),
+        )
+
+        if profile_data or solved_data or submission_data:
+            return profile_data or {}, solved_data or {}, submission_data or {}
+
+    return {}, {}, {}
+
+
+async def fetch_student_detailed_stats(
+    username: str,
+    session: aiohttp.ClientSession,
+    timeout_seconds: int = TIMEOUT_SECONDS
+) -> Optional[dict]:
+    """
+    Full detail-page fetch: reliable solved counts via the same 4-source
+    fallback + circuit breaker chain used by the leaderboard, plus
+    best-effort ranking/reputation/acceptance-rate/recent-submissions from
+    the alfa mirrors (the only sources that expose them). Previously the
+    profile page hit alfa-vercel directly with no fallback, so a single
+    degraded mirror took every profile view down with it.
+    """
+    username = (username or "").strip()
+    if not username or username.lower() == "higher studies":
+        return None
+
+    solved_result, _ = await fetch_stats_with_fallback(username, session)
+    profile_data, raw_solved_data, submission_data = await fetch_alfa_bonus_data(
+        username, session, timeout_seconds
+    )
+
+    acceptance_rate = 0
+    total_submissions_data = raw_solved_data.get("totalSubmissionNum", [])
+    ac_submissions_data = raw_solved_data.get("acSubmissionNum", [])
+
+    all_total = next((x for x in total_submissions_data if x.get('difficulty') == 'All'), None)
+    all_ac = next((x for x in ac_submissions_data if x.get('difficulty') == 'All'), None)
+
+    if all_total and all_ac:
+        total_sub_count = all_total.get('submissions', 0)
+        ac_sub_count = all_ac.get('submissions', 0)
+        if total_sub_count > 0:
+            acceptance_rate = round((ac_sub_count / total_sub_count) * 100, 2)
+
+    recent_submissions = submission_data.get("submission", [])[:20]
+
+    return {
+        "username": username,
+        "totalSolved": solved_result.get("total", 0),
+        "easySolved": solved_result.get("easy", 0),
+        "mediumSolved": solved_result.get("medium", 0),
+        "hardSolved": solved_result.get("hard", 0),
+        "totalSubmissions": total_submissions_data,
+        "recentSubmissions": recent_submissions,
+        "ranking": profile_data.get("ranking", 0),
+        "contributionPoint": 0,  # Not available from any current source
+        "reputation": profile_data.get("reputation", 0),
+        "acceptance_rate": acceptance_rate,
+        "fetch_error": solved_result.get("user_error"),
+        "profile_url": f"https://leetcode.com/u/{username}/"
+    }
 
 
 def get_circuit_breaker_status() -> dict:

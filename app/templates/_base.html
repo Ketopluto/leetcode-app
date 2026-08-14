@@ -1,0 +1,78 @@
+{% import "_icons.html" as ui %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <title>{% block title %}LeetCode Stats{% endblock %}</title>
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <link rel="icon" type="image/png" href="{{ url_for('assets.static', filename='favicon.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('assets.static', filename='favicon.png') }}">
+  <link rel="preconnect" href="https://rsms.me/">
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/critical.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/non-critical.css') }}">
+  {% block head %}{% endblock %}
+  <script>
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</head>
+
+<body>
+  <nav class="navbar">
+    <a href="/" class="navbar-brand">
+      <span class="brand-mark">{{ ui.icon('bar-chart', 14) }}</span>
+      <span>LeetCode Stats</span>
+    </a>
+    <div class="navbar-links">
+      {% set nav = active_nav | default('') %}
+      <a href="/" class="navbar-link {{ 'active' if nav == 'dashboard' }}">
+        <span class="icon-wrap">{{ ui.icon('home', 16) }}</span><span>Dashboard</span>
+      </a>
+      {% if session.get('hod_authenticated') %}
+      <a href="/admin" class="navbar-link {{ 'active' if nav == 'upload' }}">
+        <span class="icon-wrap">{{ ui.icon('upload', 16) }}</span><span>Upload</span>
+      </a>
+      <a href="/admin/students" class="navbar-link {{ 'active' if nav == 'students' }}">
+        <span class="icon-wrap">{{ ui.icon('users', 16) }}</span><span>Students</span>
+      </a>
+      <a href="/admin/reports" class="navbar-link {{ 'active' if nav == 'reports' }}">
+        <span class="icon-wrap">{{ ui.icon('bar-chart', 16) }}</span><span>Reports</span>
+      </a>
+      <a href="{{ url_for('admin_logout') }}" class="navbar-link logout">
+        <span class="icon-wrap">{{ ui.icon('log-out', 16) }}</span><span>Log out</span>
+      </a>
+      {% else %}
+      <a href="/admin/login" class="navbar-link admin">
+        <span class="icon-wrap">{{ ui.icon('shield', 16) }}</span><span>Admin</span>
+      </a>
+      {% endif %}
+    </div>
+  </nav>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div style="max-width: var(--maxw); margin: 20px auto -6px; padding: 0 24px;">
+    {% for category, message in messages %}
+    <div class="alert alert-{{ 'error' if category == 'error' else 'success' }}">
+      {{ ui.icon(('alert-triangle' if category == 'error' else 'check-circle'), 16) }}
+      <span>{{ message }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+
+  {% block body %}{% endblock %}
+
+  <script>
+    window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/speed-insights/script.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+
+</html>
