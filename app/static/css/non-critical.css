@@ -494,6 +494,197 @@ tbody tr.is-error td {
   color: var(--text-secondary);
 }
 
+/* --------------------------------------------------------------------------
+   Sync console
+   The only dark surface in the app, and deliberately so: it reads as an
+   instrument panel while real network work is happening, then collapses
+   back out of the way. Monospace throughout because it is a log of machine
+   work and because it makes the delta column align.
+   -------------------------------------------------------------------------- */
+.console {
+  background: #14161c;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  font-family: var(--mono);
+  color: #cfd6e4;
+  margin-top: 16px;
+}
+
+.console-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px 11px;
+}
+
+.console-title {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #7d8697;
+}
+
+.console-count {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: #cfd6e4;
+}
+
+.console-count b {
+  font-size: 17px;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* Progress rail */
+.console-rail {
+  height: 2px;
+  background: #262a35;
+  position: relative;
+  overflow: hidden;
+}
+
+.console-rail-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: #5b7cff;
+  width: 0;
+  transition: width 320ms var(--ease);
+}
+
+/* Feed */
+.console-feed {
+  max-height: 296px;
+  overflow-y: auto;
+  padding: 6px 0;
+  scrollbar-width: thin;
+  scrollbar-color: #333846 transparent;
+}
+
+.console-feed::-webkit-scrollbar {
+  width: 8px;
+}
+
+.console-feed::-webkit-scrollbar-thumb {
+  background: #333846;
+  border-radius: 4px;
+}
+
+/* Username is fixed-width so the year sits beside it rather than being
+   pushed to the far right; the year column absorbs the slack instead. */
+.console-row {
+  display: grid;
+  grid-template-columns: 178px 1fr 62px 46px;
+  align-items: baseline;
+  gap: 12px;
+  padding: 5px 16px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  animation: consoleIn 180ms var(--ease) both;
+}
+
+@keyframes consoleIn {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.console-user {
+  color: #e8ecf4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.console-year {
+  color: #666f80;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.console-total {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #9aa3b4;
+}
+
+/* The signature: a live delta column. Green only ever means "solved more
+   since the last sync" - it is data, never decoration. */
+.console-delta {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #34d399;
+}
+
+.console-delta.is-flat {
+  color: #4b5364;
+  font-weight: 400;
+}
+
+.console-delta.is-bad {
+  color: #f0a675;
+  font-weight: 400;
+  font-size: 11px;
+}
+
+.console-row.is-gained .console-user {
+  color: #fff;
+}
+
+/* Summary strip */
+.console-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  border-top: 1px solid #22262f;
+  font-size: 11.5px;
+  color: #7d8697;
+  font-variant-numeric: tabular-nums;
+}
+
+.console-summary {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.console-summary b {
+  color: #cfd6e4;
+  font-weight: 600;
+}
+
+.console-done {
+  color: #34d399;
+}
+
+@media (max-width: 620px) {
+  .console-row {
+    grid-template-columns: 1fr 56px 44px;
+  }
+
+  .console-year {
+    display: none;
+  }
+}
+
+/* Static rendering (no JS): the console only ever appears in response to a
+   click, so it stays hidden and the page reads as a plain admin panel. */
+.console.hidden {
+  display: none;
+}
+
 /* Spec list (expected columns etc.) */
 .spec {
   display: flex;

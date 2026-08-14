@@ -26,6 +26,19 @@ from app.leetcode_api import (
 
 REFRESH_COOLDOWN_SECONDS = 30  # per-student cooldown for the public "refresh my stats" endpoint
 
+# Roster slice size for the admin sync console. Small enough that each request
+# finishes well inside a serverless execution limit, large enough that a few
+# hundred students don't take hundreds of round trips.
+SYNC_BATCH_SIZE = 8
+SYNC_BATCH_MAX = 25
+
+
+def _year_display(year, section):
+    """'3rd Year (A)' / '4th Year' - the label used across the UI."""
+    suffix = 'st' if year == 1 else 'nd' if year == 2 else 'rd' if year == 3 else 'th'
+    label = f"{year}{suffix} Year"
+    return f"{label} ({section})" if section else label
+
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
@@ -898,6 +911,160 @@ def admin_refresh_stats():
             'success': False,
             'message': f'Error refreshing stats: {str(e)}'
         }), 500
+
+
+@app.route("/admin/sync-batch", methods=['POST'])
+def admin_sync_batch():
+    """
+    Sync one slice of the roster and report per-student results.
+
+    The client walks the roster by calling this repeatedly with an advancing
+    offset, which buys three things over the single blocking
+    /admin/refresh-stats call:
+
+    1. Each request stays short, so a full-roster sync no longer has to fit
+       inside a serverless function's execution limit (the reason the Vercel
+       deployment needs the batched cron endpoint at all).
+    2. Batches run one after another instead of opening the whole roster's
+       worth of connections at once, so it's gentler on the upstream mirrors
+       than the all-at-once path.
+    3. The caller gets real per-student results while the work happens,
+       rather than a single number once it's over.
+
+    Admin session required - this triggers live third-party API traffic.
+    """
+    if not session.get('hod_authenticated'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 403
+
+    payload = request.get_json(silent=True) or {}
+
+    try:
+        offset = max(int(payload.get('offset', 0)), 0)
+    except (TypeError, ValueError):
+        offset = 0
+
+    try:
+        limit = int(payload.get('limit', SYNC_BATCH_SIZE))
+    except (TypeError, ValueError):
+        limit = SYNC_BATCH_SIZE
+    limit = max(1, min(limit, SYNC_BATCH_MAX))
+
+    total = Student.query.count()
+    batch = Student.query.order_by(Student.id).offset(offset).limit(limit).all()
+
+    if not batch:
+        return jsonify({
+            'success': True, 'total': total, 'offset': offset,
+            'next_offset': None, 'results': []
+        })
+
+    student_ids = [s.id for s in batch]
+    existing = {
+        st.student_id: st
+        for st in StudentStats.query.filter(StudentStats.student_id.in_(student_ids)).all()
+    }
+
+    # Previous totals, captured before the write so we can report deltas.
+    previous = {s.id: (existing[s.id].total_solved if s.id in existing else None) for s in batch}
+
+    to_fetch = []
+    cached_map = {}
+    for s in batch:
+        if not s.leetcode_username:
+            continue
+        to_fetch.append((s.leetcode_username, s.name, s.register_number, s.year, s.section, s.id))
+        st = existing.get(s.id)
+        if st:
+            cached_map[s.leetcode_username.strip().lower()] = {
+                "easy_solved": st.easy_solved,
+                "medium_solved": st.medium_solved,
+                "hard_solved": st.hard_solved,
+                "total_solved": st.total_solved,
+            }
+
+    fetched = []
+    if to_fetch:
+        try:
+            fetched = asyncio.run(fetch_students_concurrent(to_fetch, cached_stats_map=cached_map))
+        except Exception as e:
+            log_error(f"Sync batch fetch failed at offset {offset}: {e}", tag="Admin")
+            fetched = []
+
+    by_username = {(f.get("username") or "").strip().lower(): f for f in fetched}
+    results = []
+
+    for s in batch:
+        uname = (s.leetcode_username or "").strip().lower()
+        item = by_username.get(uname)
+        prev = previous.get(s.id)
+
+        if item is None:
+            results.append({
+                'name': s.name, 'username': s.leetcode_username,
+                'year_display': _year_display(s.year, s.section),
+                'total': prev or 0, 'delta': None, 'status': 'unreachable'
+            })
+            continue
+
+        if item.get('fetch_error'):
+            results.append({
+                'name': s.name, 'username': s.leetcode_username,
+                'year_display': _year_display(s.year, s.section),
+                'total': prev or 0, 'delta': None, 'status': 'unreachable'
+            })
+            continue
+
+        new_total = item.get('total', 0)
+
+        if item.get('is_stale'):
+            # All sources failed; the fetcher fell back to the stored value,
+            # so there is nothing new to write and no delta to claim.
+            results.append({
+                'name': s.name, 'username': s.leetcode_username,
+                'year_display': _year_display(s.year, s.section),
+                'total': new_total, 'delta': None, 'status': 'cached'
+            })
+            continue
+
+        st = existing.get(s.id)
+        if not st:
+            st = StudentStats(student_id=s.id)
+            db.session.add(st)
+        st.easy_solved = item.get('easy', 0)
+        st.medium_solved = item.get('medium', 0)
+        st.hard_solved = item.get('hard', 0)
+        st.total_solved = new_total
+        st.last_updated = datetime.utcnow()
+        st.is_stale = False
+
+        try:
+            cache.delete(f"stats:{uname}")
+        except Exception:
+            pass
+
+        delta = None if prev is None else new_total - prev
+        results.append({
+            'name': s.name, 'username': s.leetcode_username,
+            'year_display': _year_display(s.year, s.section),
+            'total': new_total, 'delta': delta,
+            'status': 'gained' if (delta or 0) > 0 else 'synced'
+        })
+
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        log_error(f"Sync batch commit failed at offset {offset}: {e}", tag="Admin")
+        return jsonify({'success': False, 'message': 'Could not save this batch'}), 500
+
+    next_offset = offset + len(batch)
+    return jsonify({
+        'success': True,
+        'total': total,
+        'offset': offset,
+        'next_offset': next_offset if next_offset < total else None,
+        'results': results
+    })
 
 
 @app.route("/download")

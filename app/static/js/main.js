@@ -213,6 +213,11 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  // Changing the year applies immediately - the submit handler stays for
+  // Enter-in-the-search-box and for browsers without JS-driven change events.
+  const year = els.year();
+  if (year) year.addEventListener('change', () => loadData(year.value || ''));
+
   const search = els.search();
   if (search) search.addEventListener('input', applySearch);
 

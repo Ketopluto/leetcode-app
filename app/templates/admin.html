@@ -31,11 +31,30 @@
       <div id="refreshMessage"></div>
       <div class="row-between">
         <p class="text-sm muted mb-0">
-          Runs against the upstream LeetCode mirrors — expect this to take up to a minute on a large roster.
+          Walks the roster in batches against the upstream LeetCode mirrors, showing each student as it resolves.
         </p>
         <button id="refreshStatsBtn" class="btn btn-secondary" type="button">
           {{ ui.icon('refresh', 15) }} <span data-label>Sync now</span>
         </button>
+      </div>
+
+      <div class="console hidden" id="console">
+        <div class="console-head">
+          <span class="console-title">Syncing roster</span>
+          <span class="console-count"><b id="consoleDone">0</b> / <span id="consoleTotal">0</span></span>
+        </div>
+        <div class="console-rail">
+          <div class="console-rail-fill" id="consoleRail"></div>
+        </div>
+        <div class="console-feed" id="consoleFeed"></div>
+        <div class="console-foot">
+          <div class="console-summary">
+            <span><b id="sumGained">0</b> gained</span>
+            <span><b id="sumSynced">0</b> unchanged</span>
+            <span><b id="sumFailed">0</b> unreachable</span>
+          </div>
+          <span id="consoleClock">0:00</span>
+        </div>
       </div>
     </div>
   </div>
@@ -232,23 +251,124 @@
       validate();
     });
 
+    // --- Sync console -----------------------------------------------------
+    // Walks the roster one batch at a time, rendering each student as it
+    // resolves. Sequential by design: short requests survive serverless
+    // execution limits, and one batch of connections at a time is gentler
+    // on the upstream mirrors than opening the whole roster at once.
     const refreshBtn = document.getElementById('refreshStatsBtn');
     const refreshLabel = refreshBtn.querySelector('[data-label]');
+    const con = {
+      box: document.getElementById('console'),
+      feed: document.getElementById('consoleFeed'),
+      rail: document.getElementById('consoleRail'),
+      done: document.getElementById('consoleDone'),
+      total: document.getElementById('consoleTotal'),
+      clock: document.getElementById('consoleClock'),
+      gained: document.getElementById('sumGained'),
+      synced: document.getElementById('sumSynced'),
+      failed: document.getElementById('sumFailed'),
+    };
+
+    function cell(cls, text) {
+      const s = document.createElement('span');
+      s.className = cls;
+      s.textContent = text;
+      return s;
+    }
+
+    function addRow(r) {
+      const row = document.createElement('div');
+      row.className = 'console-row' + (r.status === 'gained' ? ' is-gained' : '');
+      row.append(cell('console-user', r.username || r.name));
+      row.append(cell('console-year', r.year_display));
+
+      const unreachable = r.status === 'unreachable';
+      row.append(cell('console-total', unreachable ? '—' : r.total));
+
+      if (unreachable) {
+        row.append(cell('console-delta is-bad', 'fail'));
+      } else if (r.status === 'cached') {
+        row.append(cell('console-delta is-bad', 'cache'));
+      } else if (r.delta > 0) {
+        row.append(cell('console-delta', '+' + r.delta));
+      } else {
+        row.append(cell('console-delta is-flat', '·'));
+      }
+
+      con.feed.append(row);
+      con.feed.scrollTop = con.feed.scrollHeight;
+    }
+
+    function mmss(ms) {
+      const s = Math.floor(ms / 1000);
+      return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    }
 
     refreshBtn.addEventListener('click', async function () {
       refreshBtn.disabled = true;
       refreshLabel.textContent = 'Syncing…';
       document.getElementById('refreshMessage').replaceChildren();
 
+      con.feed.replaceChildren();
+      con.box.classList.remove('hidden');
+      con.rail.style.width = '0%';
+      con.done.textContent = '0';
+
+      const tally = { gained: 0, synced: 0, failed: 0 };
+      const started = Date.now();
+      const ticking = setInterval(() => { con.clock.textContent = mmss(Date.now() - started); }, 500);
+
+      let offset = 0, processed = 0, total = 0, failedRun = false;
+
       try {
-        const res = await fetch('/admin/refresh-stats', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf }
-        });
-        const data = await res.json();
-        show('refreshMessage', data.success ? 'success' : 'error', data.message);
+        do {
+          const res = await fetch('/admin/sync-batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+            body: JSON.stringify({ offset })
+          });
+
+          if (!res.ok) throw new Error('Server returned ' + res.status);
+          const data = await res.json();
+          if (!data.success) throw new Error(data.message || 'Sync failed');
+
+          total = data.total;
+          con.total.textContent = total;
+
+          data.results.forEach(r => {
+            addRow(r);
+            if (r.status === 'gained') tally.gained++;
+            else if (r.status === 'unreachable') tally.failed++;
+            else tally.synced++;
+          });
+
+          processed += data.results.length;
+          con.done.textContent = processed;
+          con.gained.textContent = tally.gained;
+          con.synced.textContent = tally.synced;
+          con.failed.textContent = tally.failed;
+          con.rail.style.width = total ? (processed / total * 100) + '%' : '100%';
+
+          offset = data.next_offset;
+        } while (offset !== null && offset !== undefined);
+
+        con.rail.style.width = '100%';
       } catch (err) {
-        show('refreshMessage', 'error', 'Sync failed: ' + err.message);
+        failedRun = true;
+        show('refreshMessage', 'error', 'Sync stopped: ' + err.message);
+      }
+
+      clearInterval(ticking);
+      con.clock.textContent = mmss(Date.now() - started);
+
+      if (!failedRun) {
+        con.clock.classList.add('console-done');
+        con.clock.textContent = 'Done in ' + mmss(Date.now() - started);
+        const gainedNote = tally.gained
+          ? tally.gained + (tally.gained === 1 ? ' student' : ' students') + ' solved more since the last sync'
+          : 'No new problems solved since the last sync';
+        show('refreshMessage', 'success', 'Synced ' + processed + ' students. ' + gainedNote + '.');
       }
 
       refreshBtn.disabled = false;
